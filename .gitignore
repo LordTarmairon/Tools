@@ -5,6 +5,13 @@ _check.js
 Thumbs.db
 .DS_Store
 
+# Comprimidos / copias locales
+*.7z
+*.zip
+
+# Config local del editor (no necesaria para la web)
+.claude/
+
 # Por seguridad: nunca subir secretos ni configuración con credenciales
 secret*
 *.secret
