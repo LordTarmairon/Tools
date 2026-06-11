@@ -442,6 +442,18 @@ function finDe(n){ return n.fechaFin||n.fechaInicio; }
 function fhInicio(n){ if(!n.fechaInicio) return null; const h=n.todoElDia?'00:00':(n.horaInicio||'09:00'); return new Date(n.fechaInicio+'T'+h); }
 function horaAviso(n){ const d=fhInicio(n); if(!d) return null; return d.getTime()-(n.avisar||0)*60000; }
 function cubreDia(n,ymdStr){ if(!n.fechaInicio) return false; return ymdStr>=n.fechaInicio && ymdStr<=finDe(n); }
+// como cubreDia pero teniendo en cuenta las repeticiones (solo para mostrar en el calendario)
+function ocurreEnDia(n,ds){
+  if(!n.fechaInicio) return false;
+  if(!n.repetir || n.repetir==='no') return cubreDia(n,ds);
+  if(ds < n.fechaInicio) return false;
+  const a=deYmd(n.fechaInicio), b=deYmd(ds);
+  if(n.repetir==='diario') return true;
+  if(n.repetir==='semanal') return a.getDay()===b.getDay();
+  if(n.repetir==='mensual') return a.getDate()===b.getDate();
+  if(n.repetir==='anual') return a.getDate()===b.getDate() && a.getMonth()===b.getMonth();
+  return cubreDia(n,ds);
+}
 function esVencida(n){ if(!n.fechaInicio||n.hecho) return false; const fin=new Date(finDe(n)+'T'+(n.todoElDia?'23:59':(n.horaFin||n.horaInicio||'23:59'))); return fin<new Date(); }
 
 /* ===================== CATEGORÍAS ===================== */
@@ -562,13 +574,13 @@ function dibMes(){
   for(let d=1;d<=dias;d++){
     const fStr=anio+'-'+p2(mes+1)+'-'+p2(d);
     const cel=document.createElement('div'); cel.className='cal-celda'+(fStr===hoy?' hoy':''); cel.dataset.f=fStr; cel.innerHTML=`<span class="dia-num">${d}</span>`;
-    const delDia=notas.filter(n=>cubreDia(n,fStr)).sort((a,b)=>((a.todoElDia?'':a.horaInicio||'~')+'').localeCompare((b.todoElDia?'':b.horaInicio||'~')+''));
+    const delDia=notas.filter(n=>ocurreEnDia(n,fStr)).sort((a,b)=>((a.todoElDia?'':a.horaInicio||'~')+'').localeCompare((b.todoElDia?'':b.horaInicio||'~')+''));
     if(delDia.length){
       const cont=document.createElement('div'); cont.className='cal-barras';
       const MAX = esMovil()?2:3;
       delDia.slice(0,MAX).forEach(n=>{
         const bar=document.createElement('div'); bar.className='cal-barra'; bar.style.background=cat(n.categoria).color;
-        bar.textContent=(!n.todoElDia&&n.horaInicio?n.horaInicio+' ':'')+(n.titulo||'(sin título)');
+        bar.textContent=(n.repetir&&n.repetir!=='no'?'↻ ':'')+(!n.todoElDia&&n.horaInicio?n.horaInicio+' ':'')+(n.titulo||'(sin título)');
         bar.title=n.titulo||''; if(n.hecho) bar.style.opacity='.5';
         bar.dataset.id=n.id;
         bar.onpointerdown=e=>{ e.stopPropagation(); dragMes={n,bar,sx:e.clientX,sy:e.clientY,moved:false}; try{bar.setPointerCapture(e.pointerId);}catch(_){} };
@@ -604,7 +616,7 @@ document.addEventListener('pointerup',e=>{ if(!dragMes)return; const d=dragMes; 
 function moverEventoADia(n,target){ const delta=Math.round((deYmd(target)-deYmd(n.fechaInicio))/86400000); n.fechaInicio=target; if(n.fechaFin){ const f=deYmd(n.fechaFin); f.setDate(f.getDate()+delta); n.fechaFin=ymd(f); } n.hecho=false; n.posponer=null; guardar(); dibCalendario(); }
 function mostrarDia(fStr){
   Object.values(calCeldas).forEach(c=>c.classList.remove('sel')); if(calCeldas[fStr]) calCeldas[fStr].classList.add('sel');
-  const del=notas.filter(n=>cubreDia(n,fStr)).sort((a,b)=>(a.horaInicio||'').localeCompare(b.horaInicio||''));
+  const del=notas.filter(n=>ocurreEnDia(n,fStr)).sort((a,b)=>(a.horaInicio||'').localeCompare(b.horaInicio||''));
   const t=deYmd(fStr).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
   let h=`<div class="sec-cab" style="justify-content:space-between"><span>${t.charAt(0).toUpperCase()+t.slice(1)}</span><button class="btn btn-verde" style="font-size:14px;padding:8px 13px" onclick="nuevoEnDia('${fStr}')"><i class="bi bi-plus-lg"></i> Nuevo aquí</button></div>`;
   h+= del.length? `<div class="lista">${del.map(tarjeta).join('')}</div>` : '<p style="color:var(--suave)">No hay nada este día. Pulsa "Nuevo aquí" o doble clic en el día.</p>';
@@ -629,7 +641,7 @@ function dibTiempo(ndias){
   dias.forEach(d=>{ const ds=ymd(d); html+=`<div class="ct-dia-cab ${ds===hoyYmd()?'hoy':''}" onclick="irADia('${ds}')" title="Ver este día"><div class="ct-dn">${dn[(d.getDay()+6)%7]}</div><div class="ct-dnum">${d.getDate()}</div></div>`; });
   html+='</div>';
   html+='<div class="ct-allday" style="grid-template-columns:'+cols+'"><div class="ct-lbl">Todo<br>el día</div>';
-  dias.forEach(d=>{ const ds=ymd(d); const ad=notas.filter(n=>cubreDia(n,ds)&&(n.todoElDia||(n.fechaFin&&n.fechaFin!==n.fechaInicio)||!n.horaInicio));
+  dias.forEach(d=>{ const ds=ymd(d); const ad=notas.filter(n=>ocurreEnDia(n,ds)&&(n.todoElDia||(n.fechaFin&&n.fechaFin!==n.fechaInicio)||!n.horaInicio));
     html+=`<div class="ct-ad-col">`+ad.map(n=>`<div class="ct-chip" style="background:${cat(n.categoria).color}" onclick="abrirForm('${n.id}')">${esc(n.titulo||'(sin título)')}</div>`).join('')+`</div>`; });
   html+='</div>';
   html+='<div class="ct-scroll"><div class="ct-grid" style="grid-template-columns:'+cols+'; height:'+(24*HH)+'px">';
@@ -638,7 +650,7 @@ function dibTiempo(ndias){
   html+='</div></div>';
   cont.innerHTML=html;
   dias.forEach(d=>{ const ds=ymd(d); const col=cont.querySelector('.ct-col[data-f="'+ds+'"]');
-    const evs=notas.filter(n=>n.fechaInicio===ds && !n.todoElDia && n.horaInicio && (!n.fechaFin||n.fechaFin===n.fechaInicio));
+    const evs=notas.filter(n=>!n.todoElDia && n.horaInicio && (!n.fechaFin||n.fechaFin===n.fechaInicio) && ocurreEnDia(n,ds));
     colocarBloques(col,evs); });
   // línea de "ahora" en la columna de hoy
   const colHoy=cont.querySelector('.ct-col[data-f="'+hoyYmd()+'"]'); let scrollMin=7*60;
