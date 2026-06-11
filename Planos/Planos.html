@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icono-192.png">
+<link rel="stylesheet" href="../lib/bootstrap-icons/bootstrap-icons.min.css">
+<title>Dibujar Planos</title>
+<style>
+  :root{
+    --azul:#2563eb; --azul-osc:#1d4ed8; --azul-claro:#dbeafe;
+    --verde:#16a34a; --rojo:#dc2626; --amarillo:#f59e0b;
+    --gris:#64748b; --gris-claro:#f1f5f9; --texto:#0f172a; --borde:#cbd5e1;
+    --panel:#1e293b; --panel2:#334155; --panel-txt:#e2e8f0;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%; font-family:"Segoe UI",system-ui,Arial,sans-serif; overflow:hidden;}
+  body{display:flex; flex-direction:column; height:100vh; background:#0f172a; color:var(--panel-txt);}
+
+  /* ===== Barra superior ===== */
+  header{
+    background:linear-gradient(180deg,#2563eb,#1d4ed8); padding:7px 12px;
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; color:#fff; z-index:20;
+    box-shadow:0 2px 8px rgba(0,0,0,.3);
+  }
+  header .logo{font-size:18px; font-weight:800; margin-right:6px; display:flex; align-items:center; gap:6px;}
+  header .sep{width:1px; height:26px; background:rgba(255,255,255,.3); margin:0 2px;}
+  header .nombre-actual{font-size:14px; opacity:.9; font-style:italic; margin-left:auto; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+  button{
+    font-family:inherit; cursor:pointer; border:none; border-radius:9px; padding:8px 12px;
+    font-weight:600; color:#fff; background:rgba(255,255,255,.15); font-size:14px;
+    display:inline-flex; align-items:center; gap:6px; justify-content:center; white-space:nowrap;
+    transition:transform .1s, filter .15s, background .15s, box-shadow .15s;
+    box-shadow:0 1px 2px rgba(0,0,0,.12);
+  }
+  button:hover{background:rgba(255,255,255,.27); transform:translateY(-1px); box-shadow:0 3px 8px rgba(0,0,0,.18);}
+  button:active{transform:translateY(0) scale(.97); box-shadow:0 1px 2px rgba(0,0,0,.15);}
+  button .bi{font-size:1.05em; line-height:1;}
+  .btn-verde{background:linear-gradient(180deg,#1aa653,#16a34a);} .btn-verde:hover{filter:brightness(1.07);}
+  .btn-rojo{background:linear-gradient(180deg,#e23b3b,#dc2626);} .btn-rojo:hover{filter:brightness(1.07);}
+  .btn-amarillo{background:linear-gradient(180deg,#fbbf24,#f59e0b); color:#422006;} .btn-amarillo:hover{filter:brightness(1.04);}
+  .toggle{background:rgba(255,255,255,.15);}
+  .toggle.on{background:#fff; color:var(--azul-osc); box-shadow:0 1px 3px rgba(0,0,0,.25);}
+
+  .cuerpo{flex:1; display:flex; min-height:0;}
+
+  .barra-plantas{
+    background:#16223a; color:#cbd5e1; padding:6px 12px; display:flex; align-items:center; gap:8px;
+    flex-wrap:wrap; border-bottom:1px solid #0b1220; z-index:15;
+  }
+  .barra-plantas .bp-tit{font-weight:700; color:#fff; font-size:14px;}
+  .barra-plantas select{font-family:inherit; font-size:14px; padding:7px 10px; border-radius:8px; border:1px solid #475569; background:#0f172a; color:#fff; font-weight:700;}
+  .barra-plantas button{background:#334155; font-size:13.5px; padding:8px 11px;}
+  .barra-plantas button:hover{background:#475569;}
+  .barra-plantas .btn-rojo{background:var(--rojo);}
+
+  /* ===== Herramientas izquierda ===== */
+  .herramientas{
+    width:170px; background:var(--panel); padding:8px; overflow-y:auto; flex-shrink:0;
+    display:flex; flex-direction:column; gap:3px;
+  }
+  .herramientas::-webkit-scrollbar{width:8px;}
+  .herramientas::-webkit-scrollbar-thumb{background:#475569; border-radius:4px;}
+  .seccion-tit{
+    font-size:12px; text-transform:uppercase; color:#94a3b8; margin:10px 4px 3px;
+    letter-spacing:.5px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;
+  }
+  .seccion-tit .flecha{transition:.2s;}
+  .seccion.cerrada .flecha{transform:rotate(-90deg);}
+  .seccion.cerrada .contenido-seccion{display:none;}
+  /* la sección "Mover" se queda fija arriba aunque hagas scroll */
+  .herramientas .seccion-fija{
+    position:sticky; top:-8px; z-index:6; background:var(--panel);
+    padding:8px 0 8px; margin:-8px 0 4px; box-shadow:0 6px 8px -6px rgba(0,0,0,.6);
+  }
+  .herramientas .seccion-fija .seccion-tit{margin-top:0;}
+  .herramientas .hbtn{
+    width:100%; justify-content:flex-start; font-size:13.5px; padding:9px 10px; background:var(--panel2);
+    border-radius:8px; gap:8px;
+  }
+  .herramientas .hbtn:hover{background:#475569;}
+  .herramientas .hbtn.activa{background:var(--azul); box-shadow:0 0 0 2px #fff inset;}
+  .herramientas .hbtn .ico{font-size:16px; width:20px; text-align:center;}
+
+  /* ===== Lienzo ===== */
+  .zona-lienzo{flex:1; position:relative; background:#fafafa; overflow:hidden;}
+  canvas{display:block; touch-action:none;}
+  .ayuda-flotante{
+    position:absolute; top:10px; left:50%; transform:translateX(-50%);
+    background:rgba(15,23,42,.82); color:#fff; padding:7px 16px; border-radius:20px;
+    font-size:13.5px; pointer-events:none; max-width:80%; text-align:center; z-index:5;
+  }
+  .tooltip-elem{
+    position:absolute; background:rgba(15,23,42,.92); color:#fff; padding:5px 11px;
+    border-radius:8px; font-size:13.5px; font-weight:600; pointer-events:none; z-index:8; white-space:nowrap;
+    box-shadow:0 2px 8px rgba(0,0,0,.3);
+  }
+  .estado{
+    position:absolute; bottom:0; left:0; right:0; background:rgba(15,23,42,.85); color:#cbd5e1;
+    font-size:12.5px; padding:5px 12px; display:flex; gap:18px; flex-wrap:wrap; z-index:5;
+  }
+  .estado b{color:#fff;}
+  .zoom-botones{position:absolute; bottom:38px; right:14px; display:flex; flex-direction:column; gap:6px; z-index:6;}
+  .zoom-botones button{width:44px; height:44px; font-size:20px; border-radius:50%; background:var(--panel); box-shadow:0 2px 8px rgba(0,0,0,.3);}
+  .zoom-botones button:hover{background:var(--panel2);}
+
+  /* ===== Panel derecho ===== */
+  .propiedades{
+    width:210px; background:var(--panel); padding:12px; overflow-y:auto; flex-shrink:0;
+    display:flex; flex-direction:column; gap:10px; font-size:14px;
+  }
+  .propiedades h3{margin:0; font-size:13px; text-transform:uppercase; color:#94a3b8; letter-spacing:.5px;}
+  .prop-vacio{color:#64748b; font-size:13px; text-align:center; padding:20px 0;}
+  .prop-fila{display:flex; flex-direction:column; gap:4px;}
+  .prop-fila label{font-size:12.5px; color:#94a3b8;}
+  .propiedades input, .propiedades select{
+    width:100%; font-size:15px; padding:8px; border-radius:7px; border:1px solid #475569;
+    background:#0f172a; color:#fff;
+  }
+  .prop-acciones{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+  .prop-acciones button{font-size:13px; padding:9px 6px;}
+  .capa-fila{display:flex; align-items:center; gap:8px; padding:6px; border-radius:7px; background:var(--panel2);}
+  .capa-fila input{width:auto; transform:scale(1.2);}
+  .capa-fila .punto{width:12px; height:12px; border-radius:3px;}
+  .capa-fila label{flex:1; color:#e2e8f0; font-size:13px; cursor:pointer;}
+
+  /* ===== Modales ===== */
+  .fondo-oscuro{position:fixed; inset:0; background:rgba(15,23,42,.65); z-index:60; display:flex; align-items:center; justify-content:center; padding:16px;}
+  .modal{background:#fff; color:var(--texto); border-radius:16px; padding:22px; width:100%; max-width:560px; max-height:88vh; overflow-y:auto;}
+  .modal h2{margin:0 0 16px; font-size:22px; color:var(--azul-osc);}
+  .modal input[type=text], .modal select{width:100%; font-size:17px; padding:11px; border:2px solid var(--borde); border-radius:10px; margin-bottom:14px; color:var(--texto);}
+  .modal-botones{display:flex; gap:10px; margin-top:6px;}
+  .modal-botones button{flex:1; font-size:16px; padding:13px;}
+  .grid-planos{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-bottom:14px;}
+  .tarjeta-plano{border:2px solid var(--borde); border-radius:12px; overflow:hidden; cursor:pointer; transition:.15s; background:#fff;}
+  .tarjeta-plano:hover{border-color:var(--azul); transform:translateY(-3px); box-shadow:0 6px 16px rgba(0,0,0,.15);}
+  .tarjeta-plano img{width:100%; height:100px; object-fit:cover; background:#f8fafc; display:block;}
+  .tarjeta-plano .tp-info{padding:8px;}
+  .tarjeta-plano .tp-nombre{font-weight:700; font-size:15px; word-break:break-word;}
+  .tarjeta-plano .tp-fecha{font-size:12px; color:var(--gris);}
+  .tarjeta-plano .tp-borrar{width:100%; margin-top:6px; font-size:12px; padding:6px; background:var(--rojo);}
+  .ayuda-txt{color:var(--gris); font-size:14px; margin-top:0;}
+
+  #modal3d{position:fixed; inset:0; z-index:80; background:#eaf0f7; display:none; flex-direction:column;}
+  #modal3d .barra3d{background:linear-gradient(180deg,#2563eb,#1d4ed8); color:#fff; padding:9px 14px; display:flex; align-items:center; gap:10px; box-shadow:0 2px 8px rgba(0,0,0,.3);}
+  #modal3d .barra3d h2{font-size:19px; margin:0; flex:1; display:flex; align-items:center; gap:8px;}
+  #lienzo3d-cont{flex:1; position:relative; min-height:0;}
+  #lienzo3d-cont canvas{display:block;}
+  #modal3d .hint3d{position:absolute; bottom:12px; left:50%; transform:translateX(-50%); background:rgba(15,23,42,.82); color:#fff; padding:7px 16px; border-radius:18px; font-size:13.5px; pointer-events:none;}
+
+  /* botones flotantes y fondo de cajones (solo en móvil) */
+  .fab{display:none; position:absolute; z-index:16; width:48px; height:48px; border-radius:50%;
+    align-items:center; justify-content:center; font-size:22px; background:var(--azul); color:#fff;
+    border:none; box-shadow:0 3px 10px rgba(0,0,0,.35); cursor:pointer;}
+  .fab.fab-tl{top:12px; left:12px;}
+  .fab.fab-tr{top:12px; right:12px; background:#334155;}
+  .drawer-back{display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:38;}
+  .drawer-back.activo{display:block;}
+  /* grupo de acciones de la cabecera (en escritorio va en línea) */
+  .h-acc{display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1;}
+  .ham{display:none;} #menuApp{display:none;}
+
+  @media (max-width:820px){
+    .propiedades{width:160px;}
+    .herramientas{width:140px;}
+  }
+  @media (max-width:760px){
+    /* cabecera mínima: solo logo + hamburguesa */
+    header{flex-wrap:nowrap; gap:8px; padding:8px 12px;}
+    header .logo span{display:none;}
+    .ham{display:inline-flex; margin-left:auto; width:44px; height:44px; font-size:22px;}
+    /* todo lo demás (acciones + plantas) se mete en el menú desplegable */
+    #headerAcciones{display:none;}
+    #menuApp{display:block; position:fixed; top:0; left:0; right:0; max-height:88vh; overflow-y:auto;
+      background:var(--panel); z-index:42; transform:translateY(-110%); transition:transform .26s ease;
+      box-shadow:0 10px 24px rgba(0,0,0,.4); padding:10px 12px 16px; border-radius:0 0 16px 16px;}
+    #menuApp.abierto{transform:translateY(0);}
+    #menuApp .h-acc, #menuApp .barra-plantas{display:flex; flex-direction:column; align-items:stretch; gap:7px; background:transparent; padding:0; border:none;}
+    #menuApp .h-acc{margin-bottom:8px;}
+    #menuApp button{justify-content:flex-start; font-size:16px; padding:13px 14px; width:100%;}
+    #menuApp .sep{display:none;}
+    #menuApp .nombre-actual{display:none;}
+    #menuApp .bp-tit{color:var(--panel-txt); padding:6px 2px 0; font-weight:700;}
+    #menuApp select{width:100%; font-size:16px; padding:12px;}
+    #menuApp::before{content:"Menú"; display:block; color:#94a3b8; font-weight:800; font-size:13px; letter-spacing:.5px; text-transform:uppercase; padding:2px 2px 10px;}
+    /* los FABs aparecen */
+    .fab{display:flex;}
+    #fabProps{display:none;}
+    #fabProps.hay{display:flex;}
+    /* herramientas = cajón izquierdo */
+    .herramientas{position:fixed; top:0; left:0; height:100%; width:220px; z-index:40;
+      transform:translateX(-106%); transition:transform .25s ease; box-shadow:6px 0 20px rgba(0,0,0,.35);}
+    .herramientas.abierto{transform:translateX(0);}
+    /* propiedades = cajón derecho */
+    .propiedades{display:flex; position:fixed; top:0; right:0; height:100%; width:240px; z-index:40;
+      transform:translateX(106%); transition:transform .25s ease; box-shadow:-6px 0 20px rgba(0,0,0,.35);}
+    .propiedades.abierto{transform:translateX(0);}
+    /* estado más discreto */
+    .estado{font-size:11px; gap:10px; padding:4px 8px;}
+    .estado span:nth-child(3){display:none;}
+    .zoom-botones{bottom:54px;}
+  }
+</style>
+</head>
+<body>
+<div id="drawerBack" class="drawer-back" onclick="cerrarDrawers()"></div>
+
+<header>
+  <div class="logo"><i class="bi bi-rulers"></i> <span>Planos</span></div>
+  <button class="ham" onclick="toggleMenu()" title="Menú"><i class="bi bi-list"></i></button>
+  <div id="headerAcciones" class="h-acc">
+  <button class="btn-verde" onclick="nuevoPlano()"><i class="bi bi-file-earmark-plus"></i> Nuevo</button>
+  <button onclick="abrirGuardar()"><i class="bi bi-floppy"></i> Guardar</button>
+  <button onclick="abrirCargar()"><i class="bi bi-folder2-open"></i> Abrir</button>
+  <div class="sep"></div>
+  <button id="btnDeshacer" onclick="deshacer()" title="Deshacer el último cambio (Ctrl+Z)"><i class="bi bi-arrow-counterclockwise"></i></button>
+  <button id="btnRehacer" onclick="rehacerAccion()" title="Rehacer (Ctrl+Y)"><i class="bi bi-arrow-clockwise"></i></button>
+  <div class="sep"></div>
+  <button onclick="exportarPNG()" title="Guardar el plano como imagen"><i class="bi bi-image"></i> Imagen</button>
+  <button onclick="imprimir()" title="Imprimir el plano"><i class="bi bi-printer"></i> Imprimir</button>
+  <div class="sep"></div>
+  <button id="tgRejilla" class="toggle on" onclick="alternarRejilla()" title="Mostrar u ocultar la cuadrícula de fondo"><i class="bi bi-grid-3x3"></i> Rejilla</button>
+  <button id="tgIman" class="toggle on" onclick="alternarIman()" title="IMÁN: hace que lo que dibujas se pegue a la cuadrícula para que quede alineado y recto"><i class="bi bi-magnet"></i> Imán</button>
+  <button id="tgOrtho" class="toggle on" onclick="alternarOrtho()" title="90°: obliga a que las paredes salgan rectas (horizontales o verticales)"><i class="bi bi-bounding-box"></i> 90°</button>
+  <button id="tgSim" class="toggle on" onclick="alternarSim()" title="Probar la instalación eléctrica: los cables y aparatos con corriente se iluminan"><i class="bi bi-lightning-charge-fill"></i> Probar</button>
+  <button id="tgRed" class="toggle on" onclick="alternarRed()" title="Simular la red: cobertura WiFi y si llega la conexión a cada sitio"><i class="bi bi-wifi"></i> Red</button>
+  <button class="btn-amarillo" onclick="abrir3D()" title="Ver el plano en 3 dimensiones"><i class="bi bi-badge-3d"></i> Ver en 3D</button>
+  <button onclick="abrir('modalAyuda')" title="Ayuda"><i class="bi bi-question-circle"></i> Ayuda</button>
+  <button id="btnInstalar" class="btn-amarillo" style="display:none;" onclick="instalarApp()" title="Instalar este programa en tu equipo como una app, con su icono"><i class="bi bi-download"></i> Instalar</button>
+  <div class="nombre-actual" id="nombreActual"></div>
+  </div>
+</header>
+<div id="menuApp"></div>
+
+<div class="barra-plantas" id="barraPlantas">
+  <span class="bp-tit"><i class="bi bi-building"></i> Planta:</span>
+  <select id="selPlanta" onchange="cambiarPlanta(+this.value)"></select>
+  <button onclick="nuevaPlanta()" title="Añadir una planta nueva (vacía)"><i class="bi bi-plus-lg"></i> Añadir</button>
+  <button onclick="duplicarPlanta()" title="Crear una copia de esta planta"><i class="bi bi-copy"></i> Duplicar</button>
+  <button onclick="renombrarPlanta()" title="Cambiar el nombre de la planta"><i class="bi bi-pencil"></i> Nombre</button>
+  <button class="btn-rojo" onclick="borrarPlanta()" title="Borrar esta planta"><i class="bi bi-trash"></i></button>
+  <button id="tgInferior" class="toggle" onclick="alternarInferior()" title="Mostrar la planta de abajo en gris, como guía para calcar paredes encima"><i class="bi bi-layers"></i> Ver planta de abajo</button>
+</div>
+
+<div class="cuerpo">
+  <!-- Herramientas -->
+  <div class="herramientas" id="herramientas"></div>
+
+  <!-- Lienzo -->
+  <div class="zona-lienzo" id="zonaLienzo">
+    <canvas id="lienzo"></canvas>
+    <button class="fab fab-tl" onclick="toggleDrawer('herramientas')" title="Herramientas"><i class="bi bi-tools"></i></button>
+    <button class="fab fab-tr" id="fabProps" onclick="toggleDrawer('propiedades')" title="Propiedades"><i class="bi bi-sliders2"></i></button>
+    <div class="ayuda-flotante" id="ayuda">Elige una herramienta y empieza a dibujar</div>
+    <div class="tooltip-elem" id="tooltipElem" style="display:none;"></div>
+    <div class="zoom-botones">
+      <button onclick="zoom(1.2)" title="Acercar"><i class="bi bi-zoom-in"></i></button>
+      <button onclick="zoom(0.8)" title="Alejar"><i class="bi bi-zoom-out"></i></button>
+      <button onclick="ajustarVista()" title="Ver todo"><i class="bi bi-arrows-fullscreen"></i></button>
+      <button onclick="centrarVista()" title="Centrar"><i class="bi bi-bullseye"></i></button>
+    </div>
+    <div class="estado">
+      <span>📍 <b id="estPos">0,00 ; 0,00 m</b></span>
+      <span>🔎 <b id="estZoom">100%</b></span>
+      <span>📐 Escala: <b id="estEscala"></b></span>
+      <span>🏠 Sup. total: <b id="estArea">0 m²</b></span>
+    </div>
+  </div>
+
+  <!-- Propiedades + capas -->
+  <div class="propiedades" id="propiedades">
+    <h3>Propiedades</h3>
+    <div id="panelPropiedades"><div class="prop-vacio">Selecciona algo del plano para ver y cambiar sus datos.</div></div>
+    <h3 style="margin-top:8px;">Capas (mostrar/ocultar)</h3>
+    <div id="panelCapas"></div>
+    <h3 style="margin-top:8px;">Escala</h3>
+    <div class="prop-fila">
+      <label>Metros por cuadrado</label>
+      <select id="selEscala" onchange="cambiarEscala(this.value)">
+        <option value="0.25">0,25 m</option>
+        <option value="0.5" selected>0,5 m</option>
+        <option value="1">1 m</option>
+        <option value="2">2 m</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Modal texto -->
+<div class="fondo-oscuro" id="modalTexto" style="display:none;">
+  <div class="modal" style="max-width:420px;">
+    <h2>🔤 Escribe el texto</h2>
+    <input type="text" id="entradaTexto" placeholder="Ej: Salón, Cocina, 220V...">
+    <div class="modal-botones">
+      <button class="btn-rojo" onclick="cerrar('modalTexto')">Cancelar</button>
+      <button class="btn-verde" onclick="confirmarTexto()">Poner</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal guardar -->
+<div class="fondo-oscuro" id="modalGuardar" style="display:none;">
+  <div class="modal" style="max-width:420px;">
+    <h2>💾 Guardar plano</h2>
+    <input type="text" id="nombrePlano" placeholder="Nombre (ej: Casa del pueblo)">
+    <div class="modal-botones">
+      <button class="btn-rojo" onclick="cerrar('modalGuardar')">Cancelar</button>
+      <button class="btn-verde" onclick="confirmarGuardar()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal cargar -->
+<div class="fondo-oscuro" id="modalCargar" style="display:none;">
+  <div class="modal">
+    <h2>📂 Mis planos</h2>
+    <p class="ayuda-txt" id="cargarVacio" style="display:none;">Todavía no has guardado ningún plano.</p>
+    <div class="grid-planos" id="gridPlanos"></div>
+    <div class="modal-botones">
+      <button class="btn-rojo" onclick="cerrar('modalCargar')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal ayuda -->
+<div class="fondo-oscuro" id="modalAyuda" style="display:none;">
+  <div class="modal" style="max-width:560px;">
+    <h2>❓ Cómo se usa</h2>
+    <div style="font-size:16px; line-height:1.6;">
+      <p><b>Moverte por el plano:</b> arrastra con el <b>botón central (la rueda) del ratón</b>, o mantén pulsada la tecla <b>Espacio</b> y arrastra, o usa la herramienta <b>✋ Mover vista</b>.</p>
+      <p><b>Acercar / alejar:</b> gira la <b>rueda del ratón</b>, o usa los botones ➕ ➖. El botón 🔍 encuadra todo el dibujo.</p>
+      <p><b>🧲 Imán:</b> cuando está activado, lo que dibujas se “pega” a la cuadrícula para que todo quede alineado y recto. Si lo apagas, puedes colocar las cosas libremente.</p>
+      <p><b>⌐ 90°:</b> obliga a que las paredes salgan totalmente rectas (en horizontal o vertical). Apágalo para hacer paredes en diagonal.</p>
+      <p><b>Girar / mover / borrar:</b> selecciona un elemento con 🖱️ y usa el panel de la derecha (girar, duplicar, tamaño, borrar). También puedes arrastrarlo para moverlo.</p>
+      <p><b>↩️ Deshacer:</b> deshace el último cambio (o pulsa Ctrl+Z).</p>
+      <p><b>🏢 Plantas:</b> en la barra de arriba puedes crear varias plantas (baja, primera…) con <b>➕ Añadir</b>, copiar la actual con <b>⧉ Duplicar</b>, cambiar su nombre o borrarla. Activa <b>👻 Ver planta de abajo</b> para ver la planta inferior en gris y poder <b>calcar</b> las paredes encima, así coinciden de un piso a otro.</p>
+      <p><b>⚡ Probar (simulación eléctrica):</b> coloca un <b>Cuadro</b> (la fuente de corriente) y une con <b>cables</b> el cuadro → interruptor → luz o enchufe. Los cables y aparatos <b>con corriente se iluminan</b>. Si <b>apagas un interruptor</b> (doble clic sobre él, o el botón de su panel), el cable deja de brillar a partir de ahí: así ves <b>hasta dónde llega</b>. En el panel de cada aparato puedes poner voltios, amperios o vatios, y elegir el <b>tipo de cable</b> (iluminación, enchufes, tierra…).</p>
+      <p><b>📶 Red (simulación de datos):</b> coloca un <b>Router</b> (en su panel pones el nombre WiFi, la IP y el alcance en metros). El WiFi se ve como una <b>mancha verde</b> de cobertura que se reduce con la distancia y con las <b>paredes</b>. Cada aparato de red (ordenador, roseta…) muestra si tiene conexión y con cuánta señal. Con <b>Cable de red</b> conectas Router → roseta/ordenador (conexión perfecta). Y con dos <b>PLC</b> llevas internet a otra zona <b>por los cables eléctricos</b>: uno junto al router (unido con cable de red) y otro en el mismo circuito eléctrico.</p>
+      <p><b>↕️ Unir plantas (subidas/montantes):</b> para llevar la corriente o la red de una planta a otra, usa una <b>Subida</b>. En el menú Eléctrico está la "Subida (planta)" y en Red/Datos la "Subida red (planta)". Pon una en la planta baja (conéctala con su cable) y otra en el <b>mismo sitio</b> de la planta de arriba (usa "👻 Ver planta de abajo" para colocarla justo encima). Las dos subidas quedan unidas y la corriente/red pasa de una planta a otra.</p>
+      <p><b>🧊 Ver en 3D:</b> levanta las paredes y muebles del plano en 3 dimensiones y <b>apila todas las plantas</b> para ver la casa entera. Dentro: <b>arrastra</b> para girar alrededor y usa la <b>rueda</b> para acercarte o alejarte.</p>
+      <p><b>⬇️ Instalar app:</b> instala este programa en el equipo (o en el móvil) como una aplicación con su propio icono, para abrirlo sin navegador y usarlo sin conexión. El botón solo aparece cuando el navegador lo permite.</p>
+    </div>
+    <div class="modal-botones"><button class="btn-verde" onclick="cerrar('modalAyuda')">Entendido</button></div>
+  </div>
+</div>
+
+<!-- Vista 3D -->
+<div id="modal3d">
+  <div class="barra3d">
+    <h2><i class="bi bi-badge-3d"></i> Vista 3D</h2>
+    <button onclick="cerrar3D()" class="btn-rojo"><i class="bi bi-x-lg"></i> Cerrar</button>
+  </div>
+  <div id="lienzo3d-cont">
+    <div class="hint3d">🖱️ Arrastra para girar · rueda para acercar</div>
+  </div>
+</div>
+
+<script src="../lib/three/three.min.js"></script>
+<script>
+/* =======================================================================
+   CATÁLOGO DE HERRAMIENTAS Y SÍMBOLOS
+   ======================================================================= */
+const CAPAS = {
+  construccion:{nombre:'Construcción', color:'#0f172a', visible:true},
+  electrico:   {nombre:'Eléctrico',    color:'#16a34a', visible:true},
+  fontaneria:  {nombre:'Fontanería',   color:'#0ea5e9', visible:true},
+  muebles:     {nombre:'Muebles',      color:'#92400e', visible:true},
+  datos:       {nombre:'Red / Datos',  color:'#7c3aed', visible:true},
+  anotacion:   {nombre:'Anotaciones',  color:'#dc2626', visible:true},
+};
+
+// Símbolos: tamaño real en metros + función de dibujo (en coords de mundo, centrado en 0,0)
+const SIMBOLOS = {
+  // --- Eléctrico ---
+  enchufe:      {nombre:'Enchufe',        capa:'electrico', cat:'electrico', m:[0.35,0.35], dib:dEnchufe},
+  enchufe2:     {nombre:'Enchufe doble',  capa:'electrico', cat:'electrico', m:[0.45,0.35], dib:dEnchufe2},
+  interruptor:  {nombre:'Interruptor',    capa:'electrico', cat:'electrico', m:[0.35,0.35], dib:dInterruptor},
+  conmutador:   {nombre:'Conmutador',     capa:'electrico', cat:'electrico', m:[0.4,0.35],  dib:dConmutador},
+  luz:          {nombre:'Luz techo',      capa:'electrico', cat:'electrico', m:[0.5,0.5],   dib:dLuz},
+  aplique:      {nombre:'Aplique pared',  capa:'electrico', cat:'electrico', m:[0.4,0.3],   dib:dAplique},
+  cuadro:       {nombre:'Cuadro eléct.',  capa:'electrico', cat:'electrico', m:[0.6,0.4],   dib:dCuadro},
+  tvtoma:       {nombre:'Toma TV',        capa:'electrico', cat:'electrico', m:[0.35,0.35], dib:dTomaTV},
+  redtoma:      {nombre:'Toma datos',     capa:'electrico', cat:'electrico', m:[0.35,0.35], dib:dTomaRed},
+  subida:       {nombre:'Subida (planta)',capa:'electrico', cat:'electrico', m:[0.32,0.32], dib:dSubida},
+  // --- Fontanería ---
+  inodoro:      {nombre:'Inodoro',        capa:'fontaneria', cat:'fontaneria', m:[0.4,0.65], dib:dInodoro},
+  lavabo:       {nombre:'Lavabo',         capa:'fontaneria', cat:'fontaneria', m:[0.6,0.45], dib:dLavabo},
+  bidet:        {nombre:'Bidé',           capa:'fontaneria', cat:'fontaneria', m:[0.4,0.55], dib:dBidet},
+  ducha:        {nombre:'Ducha',          capa:'fontaneria', cat:'fontaneria', m:[0.9,0.9],  dib:dDucha},
+  banera:       {nombre:'Bañera',         capa:'fontaneria', cat:'fontaneria', m:[1.7,0.7],  dib:dBanera},
+  fregadero:    {nombre:'Fregadero',      capa:'fontaneria', cat:'fontaneria', m:[0.8,0.5],  dib:dFregadero},
+  // --- Muebles ---
+  camadoble:    {nombre:'Cama doble',     capa:'muebles', cat:'muebles', m:[1.5,2.0], dib:dCamaDoble},
+  camaind:      {nombre:'Cama individual',capa:'muebles', cat:'muebles', m:[0.9,1.9], dib:dCamaInd},
+  sofa:         {nombre:'Sofá',           capa:'muebles', cat:'muebles', m:[2.0,0.9], dib:dSofa},
+  mesa:         {nombre:'Mesa',           capa:'muebles', cat:'muebles', m:[1.2,0.8], dib:dMesa},
+  silla:        {nombre:'Silla',          capa:'muebles', cat:'muebles', m:[0.45,0.45], dib:dSilla},
+  armario:      {nombre:'Armario',        capa:'muebles', cat:'muebles', m:[1.2,0.6], dib:dArmario},
+  nevera:       {nombre:'Nevera',         capa:'muebles', cat:'muebles', m:[0.7,0.7], dib:dNevera},
+  cocina:       {nombre:'Cocina/fogones', capa:'muebles', cat:'muebles', m:[0.6,0.6], dib:dCocina},
+  lavadora:     {nombre:'Lavadora',       capa:'muebles', cat:'muebles', m:[0.6,0.6], dib:dLavadora},
+  tv:           {nombre:'Televisión',     capa:'muebles', cat:'muebles', m:[1.0,0.12], dib:dTV},
+  // --- Red / Datos ---
+  router:       {nombre:'Router WiFi',    capa:'datos', cat:'datos', m:[0.35,0.28], dib:dRouter},
+  ap:           {nombre:'Punto acceso',   capa:'datos', cat:'datos', m:[0.3,0.3],   dib:dAP},
+  switchred:    {nombre:'Switch de red',  capa:'datos', cat:'datos', m:[0.35,0.18], dib:dSwitchRed},
+  roseta:       {nombre:'Roseta de red',  capa:'datos', cat:'datos', m:[0.2,0.2],   dib:dRoseta},
+  plc:          {nombre:'PLC',            capa:'datos', cat:'datos', m:[0.16,0.22],  dib:dPLC},
+  pc:           {nombre:'Ordenador',      capa:'datos', cat:'datos', m:[0.45,0.4],   dib:dPC},
+  subidared:    {nombre:'Subida red (planta)', capa:'datos', cat:'datos', m:[0.32,0.32], dib:dSubidaRed},
+};
+
+// Herramientas de dibujo directo
+const HERRAMIENTAS = [
+  {seccion:'Mover', items:[
+    {h:'seleccionar', ico:'🖱️', txt:'Seleccionar'},
+    {h:'mano', ico:'✋', txt:'Mover vista'},
+  ]},
+  {seccion:'Construir', items:[
+    {h:'pared', ico:'🧱', txt:'Pared'},
+    {h:'habitacion', ico:'⬛', txt:'Habitación'},
+    {h:'puerta', ico:'🚪', txt:'Puerta'},
+    {h:'ventana', ico:'🪟', txt:'Ventana'},
+  ]},
+  {seccion:'Eléctrico', cat:'electrico'},
+  {seccion:'Red / Datos', cat:'datos', items:[
+    {h:'cablered', ico:'🌐', txt:'Cable de red'},
+  ]},
+  {seccion:'Fontanería', cat:'fontaneria'},
+  {seccion:'Muebles', cat:'muebles'},
+  {seccion:'Anotar', items:[
+    {h:'cota', ico:'📏', txt:'Medida'},
+    {h:'cable', ico:'➰', txt:'Línea/cable'},
+    {h:'texto', ico:'🔤', txt:'Texto'},
+  ]},
+];
+
+const ICONOS_SIMB = {
+  enchufe:'🔌',enchufe2:'🔌',interruptor:'💡',conmutador:'🔀',luz:'⭕',aplique:'🔆',cuadro:'⚡',tvtoma:'📺',redtoma:'🌐',
+  router:'📶',ap:'📡',switchred:'🔳',roseta:'🟪',plc:'🔌',pc:'💻',subida:'↕️',subidared:'↕️',
+  inodoro:'🚽',lavabo:'🧼',bidet:'🚿',ducha:'🚿',banera:'🛁',fregadero:'🚰',
+  camadoble:'🛏️',camaind:'🛏️',sofa:'🛋️',mesa:'🪑',silla:'🪑',armario:'🚪',nevera:'🧊',cocina:'🍳',lavadora:'🌀',tv:'📺',
+};
+
+const AYUDAS = {
+  seleccionar:'Toca un elemento para seleccionarlo. Arrástralo para moverlo. Arrastra en vacío para seleccionar varios.',
+  mano:'Arrastra para mover la vista',
+  pared:'Arrastra para dibujar una pared (mantén 90° activado para que salga recta)',
+  habitacion:'Arrastra para crear una habitación. Verás sus medidas y superficie.',
+  puerta:'Toca sobre una pared para colocar la puerta',
+  ventana:'Toca sobre una pared para colocar la ventana',
+  cota:'Arrastra entre dos puntos para medir la distancia',
+  cable:'Toca para ir poniendo puntos del cable. Conecta Cuadro → Interruptor → Luz. Doble toque o Enter para terminar.',
+  cablered:'Cable de red: toca punto a punto para conectar Router → roseta/ordenador. Doble toque o Enter para terminar.',
+  texto:'Toca donde quieras escribir',
+  simbolo:'Toca donde quieras colocarlo. Luego puedes girarlo en el panel derecho.'
+};
+
+/* =======================================================================
+   ESTADO
+   ======================================================================= */
+const lienzo = document.getElementById('lienzo');
+let ctx = lienzo.getContext('2d');
+let dpr = window.devicePixelRatio || 1;
+let plantas = [{nombre:'Planta baja', objetos:[]}];   // varias plantas (baja, primera...)
+let plantaActual = 0;
+let objetos = plantas[0].objetos;                     // siempre apunta a la planta activa
+let verInferior = false;                              // mostrar la planta de abajo como guía (calcar)
+let dibujandoFantasma = false;                        // dibujando la planta inferior (atenuada)
+function setObjetos(arr){ objetos=arr; if(plantas[plantaActual]) plantas[plantaActual].objetos=arr; }
+let herramienta = 'seleccionar';
+let simboloActivo = null;
+let GRID = 50;                 // px de mundo por cuadrado
+let metrosPorCuadro = 0.5;
+let GROSOR_PARED = 12;         // px de mundo
+let vista = {x:0,y:0,escala:1};
+let imanRejilla = true, ortho = true, verRejilla = true;
+let seleccion = [];           // array de objetos
+let accion = null;            // {tipo, ...} arrastre en curso
+let dibujando = null;
+let cableActual = null;
+let historial = [], rehacer = [];
+let pendiente = null;         // posición pendiente (texto)
+let promptInstalar = null;
+let espacio = false;            // barra espaciadora pulsada (para mover la vista)
+let simulando = true;           // mostrar simulación eléctrica (brillo de cables)
+let simRes = null;              // resultado de la última simulación eléctrica
+let simRed = true;              // mostrar simulación de red/datos (cobertura WiFi)
+let redRes = null;              // resultado de la última simulación de red
+const COL_CABLE = { normal:'#475569', luz:'#f59e0b', enchufes:'#dc2626', fase:'#7c2d12', tierra:'#16a34a', datos:'#7c3aed' };
+const TIPOS_CABLE = [['normal','Normal'],['luz','Iluminación'],['enchufes','Enchufes'],['fase','Fase'],['tierra','Tierra'],['datos','Datos']];
+
+/* =======================================================================
+   CONSTRUIR BARRA DE HERRAMIENTAS
+   ======================================================================= */
+function construirHerramientas(){
+  const cont = document.getElementById('herramientas');
+  cont.innerHTML='';
+  HERRAMIENTAS.forEach((grupo,gi)=>{
+    const sec = document.createElement('div'); sec.className='seccion';
+    if(gi===0) sec.classList.add('seccion-fija');   // "Mover" siempre visible
+    const tit = document.createElement('div'); tit.className='seccion-tit';
+    tit.innerHTML = `<span>${grupo.seccion}</span><span class="flecha">▾</span>`;
+    tit.onclick = ()=>sec.classList.toggle('cerrada');
+    sec.appendChild(tit);
+    const c = document.createElement('div'); c.className='contenido-seccion'; c.style.display='flex'; c.style.flexDirection='column'; c.style.gap='3px';
+    if(grupo.items){
+      grupo.items.forEach(it=>{
+        const b=document.createElement('button'); b.className='hbtn'; b.dataset.h=it.h;
+        b.innerHTML=`<span class="ico">${it.ico}</span>${it.txt}`;
+        b.onclick=()=>elegir(it.h);
+        c.appendChild(b);
+      });
+    }
+    if(grupo.cat){
+      Object.keys(SIMBOLOS).filter(k=>SIMBOLOS[k].cat===grupo.cat).forEach(k=>{
+        const s=SIMBOLOS[k];
+        const b=document.createElement('button'); b.className='hbtn'; b.dataset.simbolo=k;
+        b.innerHTML=`<span class="ico">${ICONOS_SIMB[k]||'▫️'}</span>${s.nombre}`;
+        b.onclick=()=>elegirSimbolo(k);
+        c.appendChild(b);
+      });
+    }
+    sec.appendChild(c);
+    cont.appendChild(sec);
+  });
+}
+
+function construirCapas(){
+  const cont=document.getElementById('panelCapas'); cont.innerHTML='';
+  Object.keys(CAPAS).forEach(k=>{
+    const c=CAPAS[k];
+    const f=document.createElement('div'); f.className='capa-fila';
+    f.innerHTML=`<input type="checkbox" ${c.visible?'checked':''}>
+      <span class="punto" style="background:${c.color}"></span>
+      <label>${c.nombre}</label>`;
+    f.querySelector('input').onchange=(e)=>{ c.visible=e.target.checked; redibujar(); };
+    cont.appendChild(f);
+  });
+}
+
+/* =======================================================================
+   TAMAÑO LIENZO (con nitidez DPR)
+   ======================================================================= */
+function ajustarTamano(){
+  const z=document.getElementById('zonaLienzo');
+  dpr=window.devicePixelRatio||1;
+  lienzo.width=z.clientWidth*dpr; lienzo.height=z.clientHeight*dpr;
+  lienzo.style.width=z.clientWidth+'px'; lienzo.style.height=z.clientHeight+'px';
+  redibujar();
+}
+window.addEventListener('resize', ajustarTamano);
+function anchoCss(){ return lienzo.width/dpr; }
+function altoCss(){ return lienzo.height/dpr; }
+
+/* =======================================================================
+   COORDENADAS / UTILIDADES
+   ======================================================================= */
+function aMundo(px,py){ return {x:(px-vista.x)/vista.escala, y:(py-vista.y)/vista.escala}; }
+function aPantalla(x,y){ return {x:x*vista.escala+vista.x, y:y*vista.escala+vista.y}; }
+function snap(v){ return imanRejilla ? Math.round(v/(GRID/2))*(GRID/2) : v; }
+function mPx(m){ return m/metrosPorCuadro*GRID; }
+function pxM(px){ return px/GRID*metrosPorCuadro; }
+function fM(m){ return (Math.round(m*100)/100).toString().replace('.',',')+' m'; }
+function fM2(m2){ return (Math.round(m2*100)/100).toString().replace('.',',')+' m²'; }
+function idNuevo(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function eventoPos(e){
+  const r=lienzo.getBoundingClientRect();
+  return {px:(e.touches?e.touches[0].clientX:e.clientX)-r.left, py:(e.touches?e.touches[0].clientY:e.clientY)-r.top};
+}
+
+/* =======================================================================
+   DIBUJO PRINCIPAL
+   ======================================================================= */
+/* =======================================================================
+   SIMULACIÓN ELÉCTRICA
+   La corriente sale del Cuadro (⚡), pasa por los cables y por los
+   interruptores: si un interruptor está apagado, no deja pasar la
+   corriente más allá. Devuelve qué tramos de cable y qué aparatos
+   tienen corriente (para iluminarlos).
+   ======================================================================= */
+function calcularSim(){
+  const tol=GRID*0.6;                       // distancia para considerar dos cosas "conectadas"
+  const clusters=[];
+  // los nudos se agrupan por planta (las plantas comparten coordenadas pero son independientes)
+  const clusterDe=(x,y,piso)=>{
+    for(const c of clusters){ if(c.piso===piso && Math.hypot(c.x-x,c.y-y)<tol) return c; }
+    const c={x,y,piso,objs:[],edges:[],source:false,conduct:true,energized:false}; clusters.push(c); return c;
+  };
+  const edges=[];
+  plantas.forEach((pl,pi)=>{
+    pl.objetos.filter(o=>o.tipo==='simbolo' && o.capa==='electrico').forEach(o=>{ clusterDe(o.x,o.y,pi).objs.push(o); });
+    pl.objetos.filter(o=>o.tipo==='cable' && o.capa==='electrico').forEach(cab=>{
+      for(let i=0;i<cab.puntos.length-1;i++){
+        const a=clusterDe(cab.puntos[i].x,cab.puntos[i].y,pi), b=clusterDe(cab.puntos[i+1].x,cab.puntos[i+1].y,pi);
+        const e={a,b,cab,seg:i,energized:false}; edges.push(e); a.edges.push(e); b.edges.push(e);
+      }
+    });
+  });
+  // SUBIDAS: unen plantas distintas si hay una "subida" en el mismo sitio
+  const subs=clusters.filter(c=>c.objs.some(o=>o.clave==='subida'));
+  for(let i=0;i<subs.length;i++) for(let j=i+1;j<subs.length;j++){
+    if(subs[i].piso!==subs[j].piso && Math.hypot(subs[i].x-subs[j].x, subs[i].y-subs[j].y)<tol){
+      const e={a:subs[i],b:subs[j],cab:null,seg:-1,energized:false}; subs[i].edges.push(e); subs[j].edges.push(e);
+    }
+  }
+  clusters.forEach(c=>{
+    const interr=c.objs.filter(o=>o.clave==='interruptor'||o.clave==='conmutador');
+    c.source = c.objs.some(o=>o.clave==='cuadro');
+    c.conduct = interr.length ? interr.every(o=>o.encendido!==false) : true;
+  });
+  const cola=[];
+  clusters.forEach(c=>{ if(c.source){ c.energized=true; cola.push(c); } });
+  while(cola.length){
+    const n=cola.shift();
+    if(!n.conduct) continue;
+    n.edges.forEach(e=>{ e.energized=true; const m=e.a===n?e.b:e.a; if(!m.energized){ m.energized=true; cola.push(m); } });
+  }
+  const edgeKey=new Map(); edges.forEach(e=>{ if(e.cab) edgeKey.set(e.cab.id+'_'+e.seg, e.energized); });
+  const devEn=new Map(); clusters.forEach(c=>c.objs.forEach(o=>devEn.set(o.id,c.energized)));
+  return {edgeKey, devEn};
+}
+
+/* =======================================================================
+   SIMULACIÓN DE RED / DATOS
+   El Router da internet. Se reparte por: cables de red, y por PLC (que
+   usan la red eléctrica para llegar a otra zona). El WiFi pierde señal
+   con la distancia y con las paredes que atraviesa.
+   ======================================================================= */
+function segCruza(x1,y1,x2,y2,x3,y3,x4,y4){
+  const d=(x2-x1)*(y4-y3)-(y2-y1)*(x4-x3); if(Math.abs(d)<1e-9) return false;
+  const t=((x3-x1)*(y4-y3)-(y3-y1)*(x4-x3))/d, u=((x3-x1)*(y2-y1)-(y3-y1)*(x2-x1))/d;
+  return t>=0&&t<=1&&u>=0&&u<=1;
+}
+function paredesEntre(x1,y1,x2,y2,objs){
+  objs=objs||objetos; let n=0;
+  objs.forEach(o=>{
+    if(o.tipo==='pared'){ if(segCruza(x1,y1,x2,y2,o.x1,o.y1,o.x2,o.y2)) n++; }
+    else if(o.tipo==='habitacion'){
+      const X1=Math.min(o.x1,o.x2),X2=Math.max(o.x1,o.x2),Y1=Math.min(o.y1,o.y2),Y2=Math.max(o.y1,o.y2);
+      [[X1,Y1,X2,Y1],[X2,Y1,X2,Y2],[X2,Y2,X1,Y2],[X1,Y2,X1,Y1]].forEach(e=>{ if(segCruza(x1,y1,x2,y2,e[0],e[1],e[2],e[3])) n++; });
+    }
+  });
+  return n;
+}
+function senalWiFi(em,x,y,objs){
+  const dM=pxM(Math.hypot(x-em.x,y-em.y));
+  const par=paredesEntre(em.x,em.y,x,y,objs);
+  let pct = 100*(1 - dM/(em.alcanceM||12)) - par*18;   // cae con distancia y paredes
+  return Math.max(0, Math.round(pct));
+}
+function calcularRed(){
+  const tol=GRID*0.6;
+  // --- grafo de la red de datos en TODAS las plantas ---
+  const cl=[]; const C=(x,y,piso)=>{ for(const c of cl) if(c.piso===piso && Math.hypot(c.x-x,c.y-y)<tol) return c; const c={x,y,piso,objs:[],edges:[],fed:false}; cl.push(c); return c; };
+  const edges=[];
+  plantas.forEach((pl,pi)=>{
+    pl.objetos.filter(o=>o.tipo==='simbolo'&&o.capa==='datos').forEach(o=>C(o.x,o.y,pi).objs.push(o));
+    pl.objetos.filter(o=>o.tipo==='cable'&&o.capa==='datos').forEach(cab=>{ for(let i=0;i<cab.puntos.length-1;i++){ const a=C(cab.puntos[i].x,cab.puntos[i].y,pi),b=C(cab.puntos[i+1].x,cab.puntos[i+1].y,pi); const e={a,b,cab,seg:i}; edges.push(e); a.edges.push(e); b.edges.push(e); } });
+  });
+  // SUBIDAS de red: unen plantas distintas (subidared en el mismo sitio)
+  const subs=cl.filter(c=>c.objs.some(o=>o.clave==='subidared'));
+  for(let i=0;i<subs.length;i++) for(let j=i+1;j<subs.length;j++){ if(subs[i].piso!==subs[j].piso && Math.hypot(subs[i].x-subs[j].x,subs[i].y-subs[j].y)<tol){ const e={a:subs[i],b:subs[j],cab:null,seg:-1}; subs[i].edges.push(e); subs[j].edges.push(e); } }
+  const cola=[];
+  cl.forEach(c=>{ if(c.objs.some(o=>o.clave==='router')){ c.fed=true; cola.push(c); } });
+  const propaga=()=>{ while(cola.length){ const n=cola.shift(); n.edges.forEach(e=>{ const m=e.a===n?e.b:e.a; if(!m.fed){ m.fed=true; cola.push(m); } }); } };
+  propaga();
+  // --- puente por PLC (a través de la red eléctrica, también multi-planta vía subidas) ---
+  const plcs=cl.flatMap(c=>c.objs.filter(o=>o.clave==='plc').map(o=>({o,dc:c})));
+  if(plcs.length){
+    const ecl=[]; const E=(x,y,piso)=>{ for(const c of ecl) if(c.piso===piso && Math.hypot(c.x-x,c.y-y)<tol) return c; const c={x,y,piso,adj:[],comp:undefined,sub:false}; ecl.push(c); return c; };
+    plantas.forEach((pl,pi)=>{
+      pl.objetos.filter(o=>o.tipo==='simbolo'&&o.capa==='electrico').forEach(o=>{ const c=E(o.x,o.y,pi); if(o.clave==='subida') c.sub=true; });
+      pl.objetos.filter(o=>o.tipo==='cable'&&o.capa==='electrico').forEach(cab=>{ for(let i=0;i<cab.puntos.length-1;i++){ const a=E(cab.puntos[i].x,cab.puntos[i].y,pi),b=E(cab.puntos[i+1].x,cab.puntos[i+1].y,pi); a.adj.push(b); b.adj.push(a); } });
+    });
+    const es=ecl.filter(c=>c.sub);
+    for(let i=0;i<es.length;i++) for(let j=i+1;j<es.length;j++){ if(es[i].piso!==es[j].piso && Math.hypot(es[i].x-es[j].x,es[i].y-es[j].y)<tol){ es[i].adj.push(es[j]); es[j].adj.push(es[i]); } }
+    let comp=0; ecl.forEach(c=>{ if(c.comp===undefined){ const st=[c]; c.comp=comp; while(st.length){ const n=st.pop(); n.adj.forEach(m=>{ if(m.comp===undefined){ m.comp=comp; st.push(m); } }); } comp++; } });
+    const compDe=(x,y,piso)=>{ let best=null,bd=tol*1.6; ecl.forEach(c=>{ if(c.piso!==piso) return; const d=Math.hypot(c.x-x,c.y-y); if(d<bd){ bd=d; best=c; } }); return best?best.comp:-1; };
+    const info=plcs.map(p=>({comp:compDe(p.o.x,p.o.y,p.dc.piso), dc:p.dc, fed:p.dc.fed}));
+    let cambia=true;
+    while(cambia){ cambia=false;
+      info.forEach(a=>{ if(a.fed && a.comp>=0){ info.forEach(b=>{ if(!b.fed && b.comp===a.comp){ b.fed=true; if(b.dc && !b.dc.fed){ b.dc.fed=true; cola.push(b.dc); } cambia=true; } }); } });
+      if(cola.length) propaga();
+    }
+  }
+  // --- resultados ---
+  const fedDev=new Map(); cl.forEach(c=>c.objs.forEach(o=>fedDev.set(o.id,c.fed)));
+  const redEdge=new Map(); edges.forEach(e=>{ if(e.cab) redEdge.set(e.cab.id+'_'+e.seg, e.a.fed&&e.b.fed); });
+  const emisores=[]; cl.forEach(c=>c.objs.forEach(o=>{ if((o.clave==='router'||o.clave==='ap')&&c.fed) emisores.push({x:o.x,y:o.y,piso:c.piso,alcanceM:o.alcance||(o.clave==='router'?12:10)}); }));
+  const sig=new Map();
+  cl.forEach(c=>c.objs.forEach(o=>{
+    if(o.clave==='router'){ sig.set(o.id,{pct:100,tipo:'router'}); return; }
+    if(c.fed){ sig.set(o.id,{pct:100,tipo:'cable'}); return; }
+    const walls = plantas[c.piso] ? plantas[c.piso].objetos : objetos;
+    let best=0; emisores.forEach(em=>{ if(em.piso!==c.piso) return; if(em.x===o.x&&em.y===o.y) return; const s=senalWiFi(em,o.x,o.y,walls); if(s>best) best=s; });
+    sig.set(o.id,{pct:best, tipo: best>0?'wifi':'sin'});
+  }));
+  return {fedDev, redEdge, emisores, sig};
+}
+
+function redibujar(){
+  simRes = simulando ? calcularSim() : null;
+  redRes = simRed ? calcularRed() : null;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,anchoCss(),altoCss());
+  if(verRejilla) dibujarRejilla();
+  // planta inferior como guía (calcar)
+  if(verInferior && plantaActual>0){
+    dibujandoFantasma=true; ctx.save(); ctx.globalAlpha=0.25;
+    plantas[plantaActual-1].objetos.forEach(o=>{ if(CAPAS[o.capa].visible) dibujarObjeto(o,false); });
+    ctx.restore(); dibujandoFantasma=false;
+  }
+  // cobertura WiFi (manchas verdes que indican señal)
+  if(simRed && redRes && CAPAS.datos.visible){
+    redRes.emisores.forEach(em=>{
+      if(em.piso!==plantaActual) return;
+      const p=aPantalla(em.x,em.y); const r=mPx(em.alcanceM)*vista.escala;
+      const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+      g.addColorStop(0,'rgba(34,197,94,.22)'); g.addColorStop(.55,'rgba(132,204,22,.13)');
+      g.addColorStop(.8,'rgba(234,179,8,.10)'); g.addColorStop(1,'rgba(34,197,94,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fill();
+    });
+  }
+  objetos.forEach(o=>{ if(CAPAS[o.capa].visible) dibujarObjeto(o,false); });
+  if(dibujando) dibujarObjeto(dibujando,true);
+  if(cableActual) dibujarObjeto(cableActual,true);
+  seleccion.forEach(o=>dibujarSeleccion(o));
+  if(accion && accion.tipo==='banda') dibujarBanda();
+  actualizarEstado();
+}
+
+function dibujarRejilla(){
+  const paso=GRID*vista.escala;
+  if(paso<6) return;
+  const x0=vista.x%paso, y0=vista.y%paso;
+  // líneas finas
+  ctx.strokeStyle='#e8edf3'; ctx.lineWidth=1; ctx.beginPath();
+  for(let x=x0;x<anchoCss();x+=paso){ctx.moveTo(x,0);ctx.lineTo(x,altoCss());}
+  for(let y=y0;y<altoCss();y+=paso){ctx.moveTo(0,y);ctx.lineTo(anchoCss(),y);}
+  ctx.stroke();
+  // líneas gruesas cada 5
+  const paso5=paso*5;
+  const X0=vista.x%paso5, Y0=vista.y%paso5;
+  ctx.strokeStyle='#d4dbe5'; ctx.lineWidth=1.4; ctx.beginPath();
+  for(let x=X0;x<anchoCss();x+=paso5){ctx.moveTo(x,0);ctx.lineTo(x,altoCss());}
+  for(let y=Y0;y<altoCss();y+=paso5){ctx.moveTo(0,y);ctx.lineTo(anchoCss(),y);}
+  ctx.stroke();
+}
+
+function dibujarObjeto(o, temporal){
+  ctx.save();
+  if(temporal) ctx.globalAlpha=0.55;
+  switch(o.tipo){
+    case 'pared': dibPared(o); break;
+    case 'habitacion': dibHabitacion(o); break;
+    case 'puerta': dibPuerta(o); break;
+    case 'ventana': dibVentana(o); break;
+    case 'cota': dibCota(o); break;
+    case 'texto': dibTexto(o); break;
+    case 'cable': dibCable(o); break;
+    case 'simbolo': dibSimbolo(o); break;
+  }
+  ctx.restore();
+}
+
+function dibPared(o){
+  const a=aPantalla(o.x1,o.y1), b=aPantalla(o.x2,o.y2);
+  const g=(o.grosor||GROSOR_PARED)*vista.escala;
+  ctx.strokeStyle='#1e293b'; ctx.lineWidth=g; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  // línea central clara para dar aspecto de muro
+  ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.lineWidth=Math.max(1,g*0.25);
+  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  // longitud
+  const largoM=pxM(Math.hypot(o.x2-o.x1,o.y2-o.y1));
+  if(largoM>0.05) etiquetaLinea(a,b,fM(largoM),'#1d4ed8');
+}
+
+function dibHabitacion(o){
+  const x=Math.min(o.x1,o.x2), y=Math.min(o.y1,o.y2);
+  const w=Math.abs(o.x2-o.x1), h=Math.abs(o.y2-o.y1);
+  const p=aPantalla(x,y); const W=w*vista.escala, H=h*vista.escala;
+  ctx.fillStyle='rgba(37,99,235,.06)'; ctx.fillRect(p.x,p.y,W,H);
+  ctx.strokeStyle='#1e293b'; ctx.lineWidth=(o.grosor||GROSOR_PARED)*vista.escala; ctx.lineJoin='miter';
+  ctx.strokeRect(p.x,p.y,W,H);
+  // medidas lados
+  ctx.fillStyle='#1d4ed8'; ctx.font='13px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  conFondo(()=>ctx.fillText(fM(pxM(w)), p.x+W/2, p.y-7), p.x+W/2, p.y-7, 13);
+  ctx.save(); ctx.translate(p.x-9,p.y+H/2); ctx.rotate(-Math.PI/2);
+  ctx.fillStyle='#1d4ed8'; ctx.fillText(fM(pxM(h)),0,0); ctx.restore();
+  // nombre + superficie en el centro
+  const areaM=pxM(w)*pxM(h);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  if(o.nombre){ ctx.fillStyle='#0f172a'; ctx.font='bold 16px Segoe UI'; ctx.fillText(o.nombre, p.x+W/2, p.y+H/2-9); }
+  ctx.fillStyle='#475569'; ctx.font='14px Segoe UI'; ctx.fillText(fM2(areaM), p.x+W/2, p.y+H/2+(o.nombre?12:0));
+}
+
+function dibPuerta(o){
+  const p=aPantalla(o.x,o.y); const s=mPx(o.ancho||0.8)*vista.escala;
+  ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((o.ang||0)*Math.PI/180);
+  // hueco (corta la pared con blanco)
+  ctx.strokeStyle='#fafafa'; ctx.lineWidth=(GROSOR_PARED+2)*vista.escala; ctx.lineCap='butt';
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s,0); ctx.stroke();
+  // hoja + arco
+  ctx.strokeStyle='#92400e'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-s); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,s,-Math.PI/2,0); ctx.stroke();
+  ctx.restore();
+}
+function dibVentana(o){
+  const p=aPantalla(o.x,o.y); const s=mPx(o.ancho||1.0)*vista.escala;
+  ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((o.ang||0)*Math.PI/180);
+  ctx.strokeStyle='#fafafa'; ctx.lineWidth=(GROSOR_PARED+2)*vista.escala; ctx.lineCap='butt';
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s,0); ctx.stroke();
+  ctx.strokeStyle='#0ea5e9'; ctx.lineWidth=3;
+  const o2=GROSOR_PARED*0.28*vista.escala;
+  ctx.beginPath(); ctx.moveTo(0,-o2); ctx.lineTo(s,-o2); ctx.moveTo(0,o2); ctx.lineTo(s,o2); ctx.stroke();
+  ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s,0); ctx.stroke();
+  ctx.restore();
+}
+
+function dibCota(o){
+  const a=aPantalla(o.x1,o.y1), b=aPantalla(o.x2,o.y2);
+  ctx.strokeStyle='#dc2626'; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  flecha(a,b); flecha(b,a);
+  const dist=pxM(Math.hypot(o.x2-o.x1,o.y2-o.y1));
+  etiquetaLinea(a,b,fM(dist),'#dc2626');
+}
+function dibTexto(o){
+  const p=aPantalla(o.x,o.y);
+  ctx.fillStyle='#0f172a'; ctx.font=`bold ${(o.tam||16)*vista.escala}px Segoe UI`;
+  ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(o.txt,p.x,p.y);
+}
+function dibCable(o){
+  if(o.puntos.length<1) return;
+  const datos = o.capa==='datos';
+  const col=COL_CABLE[o.tipoCable||(datos?'datos':'normal')]||'#475569';
+  for(let i=0;i<o.puntos.length-1;i++){
+    const a=aPantalla(o.puntos[i].x,o.puntos[i].y), b=aPantalla(o.puntos[i+1].x,o.puntos[i+1].y);
+    let on=false, glow='#facc15';
+    if(datos){ on = !dibujandoFantasma && simRed && redRes && redRes.redEdge.get(o.id+'_'+i); glow='rgba(96,165,250,.95)'; }
+    else { on = !dibujandoFantasma && simulando && simRes && simRes.edgeKey.get(o.id+'_'+i); glow='rgba(253,224,71,.95)'; }
+    ctx.save();
+    ctx.strokeStyle=col; ctx.lineWidth=on?3:2.5; ctx.setLineDash(on?[]:[8,5]);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    if(on){ // núcleo brillante = conectado / con corriente
+      ctx.shadowColor=datos?'#3b82f6':'#facc15'; ctx.shadowBlur=14; ctx.strokeStyle=glow; ctx.lineWidth=2; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  o.puntos.forEach(pt=>{ const p=aPantalla(pt.x,pt.y); ctx.fillStyle=col; ctx.beginPath(); ctx.arc(p.x,p.y,3.2,0,7); ctx.fill(); });
+}
+function dibSimbolo(o){
+  const s=SIMBOLOS[o.clave]; if(!s) return;
+  const p=aPantalla(o.x,o.y);
+  ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((o.ang||0)*Math.PI/180); ctx.scale(vista.escala,vista.escala);
+  const w=mPx(s.m[0])*(o.escalaX||o.escala||1), h=mPx(s.m[1])*(o.escalaY||o.escala||1);
+  const en = (!dibujandoFantasma && simulando && o.capa==='electrico' && simRes) ? simRes.devEn.get(o.id) : undefined;
+  // halo de luz para luces encendidas
+  if(en && (o.clave==='luz'||o.clave==='aplique')){
+    const r=Math.max(w,h)*1.4;
+    const g=ctx.createRadialGradient(0,0,0,0,0,r);
+    g.addColorStop(0,'rgba(253,224,71,.85)'); g.addColorStop(1,'rgba(253,224,71,0)');
+    ctx.save(); ctx.rotate(-(o.ang||0)*Math.PI/180); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,r,0,7); ctx.fill(); ctx.restore();
+  }
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  s.dib(ctx,w,h);
+  // indicador de estado eléctrico
+  if(!dibujandoFantasma && simulando && o.capa==='electrico' && simRes){
+    ctx.save(); ctx.rotate(-(o.ang||0)*Math.PI/180);
+    const bx=Math.max(w,h)*0.5+3, by=-Math.max(w,h)*0.5-3, rr=Math.max(4,w*0.16);
+    if(o.clave==='interruptor'||o.clave==='conmutador'){
+      const onSw=o.encendido!==false;
+      ctx.beginPath(); ctx.arc(bx,by,rr,0,7); ctx.fillStyle=onSw?'#22c55e':'#ef4444'; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle='#fff'; ctx.stroke();
+    } else if(o.clave!=='cuadro'){
+      ctx.beginPath(); ctx.arc(bx,by,rr*0.85,0,7); ctx.fillStyle=en?'#22c55e':'#cbd5e1'; ctx.fill();
+    }
+    ctx.restore();
+  }
+  // indicador de red / datos
+  if(!dibujandoFantasma && simRed && o.capa==='datos' && redRes){
+    const info=redRes.sig.get(o.id); const pct=info?info.pct:0;
+    const col = (info&&info.tipo==='router') ? '#2563eb' : (pct>=70?'#22c55e':pct>=40?'#eab308':pct>=15?'#f97316':'#ef4444');
+    ctx.save(); ctx.rotate(-(o.ang||0)*Math.PI/180);
+    const bx=Math.max(w,h)*0.5+3, by=-Math.max(w,h)*0.5-3, rr=Math.max(4,w*0.18);
+    ctx.beginPath(); ctx.arc(bx,by,rr,0,7); ctx.fillStyle=col; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle='#fff'; ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/* helpers de dibujo */
+function flecha(a,b){
+  const ang=Math.atan2(b.y-a.y,b.x-a.x);
+  ctx.beginPath();
+  ctx.moveTo(a.x,a.y); ctx.lineTo(a.x+9*Math.cos(ang+0.4),a.y+9*Math.sin(ang+0.4));
+  ctx.moveTo(a.x,a.y); ctx.lineTo(a.x+9*Math.cos(ang-0.4),a.y+9*Math.sin(ang-0.4));
+  ctx.stroke();
+}
+function etiquetaLinea(a,b,txt,color){
+  const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+  ctx.font='bold 13px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const w=ctx.measureText(txt).width+10;
+  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.fillRect(mx-w/2,my-10,w,20);
+  ctx.fillStyle=color; ctx.fillText(txt,mx,my);
+}
+function conFondo(fn,x,y,size){
+  // fondo blanco simple para legibilidad de medidas
+  fn();
+}
+
+/* =======================================================================
+   DIBUJOS DE SÍMBOLOS (coordenadas de mundo, centrado en 0,0)
+   ======================================================================= */
+function rc(c,x,y,w,h,col,relleno){ c.beginPath(); c.rect(x,y,w,h); if(relleno){c.fillStyle=relleno;c.fill();} c.strokeStyle=col;c.lineWidth=2.5;c.stroke(); }
+function cir(c,x,y,r,col,relleno){ c.beginPath(); c.arc(x,y,r,0,7); if(relleno){c.fillStyle=relleno;c.fill();} c.strokeStyle=col;c.lineWidth=2.5;c.stroke(); }
+function lin(c,x1,y1,x2,y2,col,gr){ c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.strokeStyle=col; c.lineWidth=gr||2.5; c.stroke(); }
+
+// Eléctrico (verde)
+function dEnchufe(c,w,h){ const r=w/2; const col='#16a34a'; c.beginPath(); c.arc(0,0,r,Math.PI,0); c.strokeStyle=col;c.lineWidth=3;c.stroke(); lin(c,-r,0,r,0,col,3); lin(c,-r*0.4,0,-r*0.4,r*0.5,col,3); lin(c,r*0.4,0,r*0.4,r*0.5,col,3); }
+function dEnchufe2(c,w,h){ dEnchufe(c,h,h); c.save(); c.translate(h*0.7,0); dEnchufe(c,h,h); c.restore(); }
+function dInterruptor(c,w,h){ const r=w/2; cir(c,0,0,r,'#16a34a'); lin(c,0,0,r,-r,'#16a34a',3); c.fillStyle='#16a34a'; c.font=`${w*0.5}px Segoe UI`; c.textAlign='center';c.textBaseline='middle'; }
+function dConmutador(c,w,h){ const r=h/2; cir(c,0,0,r,'#16a34a'); lin(c,0,0,r,-r,'#16a34a',3); lin(c,0,0,r,-r*0.4,'#16a34a',3); }
+function dLuz(c,w,h){ const r=w/2; cir(c,0,0,r,'#f59e0b'); const d=r*0.7; lin(c,-d,-d,d,d,'#f59e0b',2.5); lin(c,d,-d,-d,d,'#f59e0b',2.5); }
+function dAplique(c,w,h){ const r=h*0.7; c.beginPath();c.arc(0,0,r,Math.PI,0);c.strokeStyle='#f59e0b';c.lineWidth=2.5;c.stroke(); lin(c,-r,0,r,0,'#f59e0b',2.5); lin(c,-r*0.5,0,r*0.5,r*0.6,'#f59e0b',2); }
+function dCuadro(c,w,h){ rc(c,-w/2,-h/2,w,h,'#dc2626','#fee2e2'); c.fillStyle='#dc2626'; c.font=`bold ${h*0.6}px Segoe UI`; c.textAlign='center'; c.textBaseline='middle'; c.fillText('⚡',0,0); }
+function dTomaTV(c,w,h){ const r=w/2; cir(c,0,0,r,'#16a34a'); c.fillStyle='#16a34a'; c.font=`bold ${w*0.45}px Segoe UI`;c.textAlign='center';c.textBaseline='middle'; c.fillText('TV',0,0); }
+function dTomaRed(c,w,h){ const r=w/2; cir(c,0,0,r,'#16a34a'); c.fillStyle='#16a34a'; c.font=`bold ${w*0.4}px Segoe UI`;c.textAlign='center';c.textBaseline='middle'; c.fillText('RJ',0,0); }
+
+// Fontanería (azul)
+function dInodoro(c,w,h){ const col='#0ea5e9'; rc(c,-w/2,-h/2,w,h*0.25,col,'#e0f2fe'); c.beginPath(); c.ellipse(0,h*0.1,w*0.42,h*0.32,0,0,7); c.fillStyle='#e0f2fe';c.fill();c.strokeStyle=col;c.lineWidth=2.5;c.stroke(); }
+function dLavabo(c,w,h){ const col='#0ea5e9'; rc(c,-w/2,-h/2,w,h,col,'#e0f2fe'); c.beginPath(); c.ellipse(0,h*0.06,w*0.32,h*0.3,0,0,7); c.strokeStyle=col;c.lineWidth=2;c.stroke(); cir(c,0,-h*0.36,h*0.06,col,col); }
+function dBidet(c,w,h){ const col='#0ea5e9'; c.beginPath(); c.ellipse(0,0,w*0.45,h*0.45,0,0,7); c.fillStyle='#e0f2fe';c.fill();c.strokeStyle=col;c.lineWidth=2.5;c.stroke(); cir(c,0,-h*0.3,h*0.05,col,col); }
+function dDucha(c,w,h){ const col='#0ea5e9'; rc(c,-w/2,-h/2,w,h,col,'#e0f2fe'); lin(c,-w/2,-h/2,w/2,h/2,col,1.5); lin(c,w/2,-h/2,-w/2,h/2,col,1.5); cir(c,w*0.32,-h*0.32,h*0.07,col,col); }
+function dBanera(c,w,h){ const col='#0ea5e9'; rc(c,-w/2,-h/2,w,h,col,'#e0f2fe'); c.beginPath(); c.roundRect? c.roundRect(-w/2+h*0.12,-h/2+h*0.12,w-h*0.24,h-h*0.24,h*0.2):c.rect(-w/2+8,-h/2+8,w-16,h-16); c.strokeStyle=col;c.lineWidth=2;c.stroke(); cir(c,-w*0.4,0,h*0.06,col,col); }
+function dFregadero(c,w,h){ const col='#0ea5e9'; rc(c,-w/2,-h/2,w,h,col,'#e0f2fe'); rc(c,-w*0.45,-h*0.3,w*0.4,h*0.6,col,'#fff'); cir(c,w*0.3,-h*0.3,h*0.07,col,col); }
+
+// Muebles (marrón)
+function dCamaDoble(c,w,h){ const col='#92400e'; rc(c,-w/2,-h/2,w,h,col,'#fdf6ec'); rc(c,-w/2,-h/2,w,h*0.22,col,'#f5e6d0'); rc(c,-w*0.4,-h*0.42,w*0.34,h*0.16,col,'#fff'); rc(c,w*0.06,-h*0.42,w*0.34,h*0.16,col,'#fff'); }
+function dCamaInd(c,w,h){ const col='#92400e'; rc(c,-w/2,-h/2,w,h,col,'#fdf6ec'); rc(c,-w/2,-h/2,w,h*0.22,col,'#f5e6d0'); rc(c,-w*0.32,-h*0.42,w*0.64,h*0.16,col,'#fff'); }
+function dSofa(c,w,h){ const col='#92400e'; rc(c,-w/2,-h/2,w,h,col,'#fdf6ec'); rc(c,-w/2,-h/2,w,h*0.3,col,'#f5e6d0'); rc(c,-w/2,-h/2,w*0.12,h,col,'#f5e6d0'); rc(c,w/2-w*0.12,-h/2,w*0.12,h,col,'#f5e6d0'); }
+function dMesa(c,w,h){ rc(c,-w/2,-h/2,w,h,'#92400e','#fdf6ec'); }
+function dSilla(c,w,h){ const col='#92400e'; rc(c,-w/2,-h/2,w,h,col,'#fdf6ec'); rc(c,-w/2,-h/2,w,h*0.22,col,'#f5e6d0'); }
+function dArmario(c,w,h){ const col='#92400e'; rc(c,-w/2,-h/2,w,h,col,'#fdf6ec'); lin(c,0,-h/2,0,h/2,col,1.5); lin(c,-w*0.5,-h/2,-w*0.5+6,-h/2,col,1); cir(c,-w*0.04,0,h*0.07,col); cir(c,w*0.04,0,h*0.07,col); }
+function dNevera(c,w,h){ const col='#475569'; rc(c,-w/2,-h/2,w,h,col,'#eef2f7'); lin(c,-w/2,-h*0.1,w/2,-h*0.1,col,1.5); lin(c,w*0.3,-h*0.4,w*0.3,-h*0.2,col,3); lin(c,w*0.3,h*0.05,w*0.3,h*0.3,col,3); }
+function dCocina(c,w,h){ const col='#475569'; rc(c,-w/2,-h/2,w,h,col,'#eef2f7'); cir(c,-w*0.22,-h*0.22,w*0.12,col); cir(c,w*0.22,-h*0.22,w*0.12,col); cir(c,-w*0.22,h*0.22,w*0.12,col); cir(c,w*0.22,h*0.22,w*0.12,col); }
+function dLavadora(c,w,h){ const col='#475569'; rc(c,-w/2,-h/2,w,h,col,'#eef2f7'); cir(c,0,h*0.05,w*0.3,col,'#fff'); cir(c,0,h*0.05,w*0.16,col); }
+function dTV(c,w,h){ const col='#0f172a'; rc(c,-w/2,-h/2,w,h,col,'#1e293b'); lin(c,-w*0.15,h/2,w*0.15,h/2,col,3); }
+
+// Red / Datos (violeta)
+function dRouter(c,w,h){ const col='#7c3aed'; rc(c,-w/2,-h*0.22,w,h*0.44,col,'#ede9fe');
+  lin(c,-w*0.25,-h*0.22,-w*0.34,-h*0.55,col,2.5); lin(c,w*0.25,-h*0.22,w*0.34,-h*0.55,col,2.5);
+  for(let i=1;i<=2;i++){ c.beginPath(); c.arc(0,-h*0.22,w*0.16*i,Math.PI*1.18,Math.PI*1.82); c.strokeStyle=col; c.lineWidth=1.8; c.stroke(); }
+  cir(c,-w*0.3,h*0.05,h*0.05,col,col); }
+function dAP(c,w,h){ const col='#7c3aed'; cir(c,0,h*0.22,w*0.16,col,'#ede9fe'); for(let i=1;i<=3;i++){ c.beginPath(); c.arc(0,h*0.22,w*0.16+i*w*0.13,Math.PI*1.2,Math.PI*1.8); c.strokeStyle=col; c.lineWidth=1.6; c.stroke(); } }
+function dSwitchRed(c,w,h){ const col='#7c3aed'; rc(c,-w/2,-h/2,w,h,col,'#ede9fe'); for(let i=0;i<4;i++){ rc(c,-w*0.42+i*w*0.22, h*0.05, w*0.13,h*0.32,col,'#fff'); } }
+function dRoseta(c,w,h){ const col='#7c3aed'; rc(c,-w/2,-h/2,w,h,col,'#ede9fe'); c.fillStyle=col; c.font=`bold ${h*0.5}px Segoe UI`; c.textAlign='center'; c.textBaseline='middle'; c.fillText('RJ',0,0); }
+function dPLC(c,w,h){ const col='#7c3aed'; rc(c,-w/2,-h*0.45,w,h*0.7,col,'#ede9fe'); c.fillStyle=col; c.font=`bold ${h*0.3}px Segoe UI`; c.textAlign='center'; c.textBaseline='middle'; c.fillText('PLC',0,-h*0.1); lin(c,-w*0.14,h*0.25,-w*0.14,h*0.5,col,2.5); lin(c,w*0.14,h*0.25,w*0.14,h*0.5,col,2.5); }
+function dPC(c,w,h){ const col='#334155'; rc(c,-w/2,-h/2,w,h*0.66,col,'#dbeafe'); rc(c,-w*0.1,h*0.18,w*0.2,h*0.12,col,'#cbd5e1'); lin(c,-w*0.22,h*0.42,w*0.22,h*0.42,col,3); }
+function dFlechasSubida(c,w,h,col,bg){ cir(c,0,0,w*0.5,col,bg); const a=w*0.22;
+  lin(c,0,-h*0.32,0,h*0.32,col,2.5);
+  lin(c,0,-h*0.32,-a,-h*0.32+a,col,2.5); lin(c,0,-h*0.32,a,-h*0.32+a,col,2.5);
+  lin(c,0,h*0.32,-a,h*0.32-a,col,2.5); lin(c,0,h*0.32,a,h*0.32-a,col,2.5); }
+function dSubida(c,w,h){ dFlechasSubida(c,w,h,'#16a34a','#dcfce7'); }
+function dSubidaRed(c,w,h){ dFlechasSubida(c,w,h,'#7c3aed','#ede9fe'); }
+
+/* =======================================================================
+   SELECCIÓN / TIRADORES
+   ======================================================================= */
+function dibujarSeleccion(o){
+  const caja=cajaPantalla(o);
+  if(!caja) return;
+  ctx.save(); ctx.strokeStyle='#2563eb'; ctx.lineWidth=1.6; ctx.setLineDash([6,4]);
+  ctx.strokeRect(caja.x-5,caja.y-5,caja.w+10,caja.h+10); ctx.setLineDash([]);
+  // tiradores
+  if(seleccion.length===1){
+    if(o.tipo==='pared'||o.tipo==='cota'){
+      tirador(aPantalla(o.x1,o.y1)); tirador(aPantalla(o.x2,o.y2));
+    } else if(o.tipo==='habitacion'){
+      tirador(aPantalla(o.x1,o.y1)); tirador(aPantalla(o.x2,o.y1));
+      tirador(aPantalla(o.x1,o.y2)); tirador(aPantalla(o.x2,o.y2));
+    }
+  }
+  ctx.restore();
+}
+function tirador(p){ ctx.fillStyle='#fff'; ctx.strokeStyle='#2563eb'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(p.x,p.y,6,0,7); ctx.fill(); ctx.stroke(); }
+
+function cajaMundo(o){
+  if(o.tipo==='pared'||o.tipo==='cota'){
+    return {x:Math.min(o.x1,o.x2), y:Math.min(o.y1,o.y2), w:Math.abs(o.x2-o.x1), h:Math.abs(o.y2-o.y1)};
+  }
+  if(o.tipo==='habitacion'){
+    return {x:Math.min(o.x1,o.x2), y:Math.min(o.y1,o.y2), w:Math.abs(o.x2-o.x1), h:Math.abs(o.y2-o.y1)};
+  }
+  if(o.tipo==='simbolo'){ const s=SIMBOLOS[o.clave]; const w=mPx(s.m[0])*(o.escalaX||o.escala||1), h=mPx(s.m[1])*(o.escalaY||o.escala||1); const r=Math.max(w,h)/2; return {x:o.x-r,y:o.y-r,w:2*r,h:2*r}; }
+  if(o.tipo==='puerta'||o.tipo==='ventana'){ const s=mPx(o.ancho||0.8); return {x:o.x-s,y:o.y-s,w:2*s,h:2*s}; }
+  if(o.tipo==='texto'){ const w=(o.txt.length*(o.tam||16)*0.55); return {x:o.x,y:o.y-(o.tam||16)/2,w:w,h:(o.tam||16)}; }
+  if(o.tipo==='cable'){ const xs=o.puntos.map(p=>p.x), ys=o.puntos.map(p=>p.y); return {x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)}; }
+  return null;
+}
+function cajaPantalla(o){ const c=cajaMundo(o); if(!c) return null; const a=aPantalla(c.x,c.y); return {x:a.x,y:a.y,w:c.w*vista.escala,h:c.h*vista.escala}; }
+
+/* =======================================================================
+   HIT TEST
+   ======================================================================= */
+function objetoEn(mx,my){
+  const tol=12/vista.escala;
+  for(let i=objetos.length-1;i>=0;i--){
+    const o=objetos[i];
+    if(!CAPAS[o.capa].visible) continue;
+    if(o.tipo==='pared'||o.tipo==='cota'){
+      if(distSeg(mx,my,o.x1,o.y1,o.x2,o.y2)<tol+4) return o;
+    } else if(o.tipo==='habitacion'){
+      const x1=Math.min(o.x1,o.x2),x2=Math.max(o.x1,o.x2),y1=Math.min(o.y1,o.y2),y2=Math.max(o.y1,o.y2);
+      const cercaBorde=(Math.abs(mx-x1)<tol||Math.abs(mx-x2)<tol)&&my>y1-tol&&my<y2+tol ||
+                       (Math.abs(my-y1)<tol||Math.abs(my-y2)<tol)&&mx>x1-tol&&mx<x2+tol;
+      const dentro=mx>x1&&mx<x2&&my>y1&&my<y2;
+      if(cercaBorde||dentro) return o;
+    } else if(o.tipo==='cable'){
+      for(let j=0;j<o.puntos.length-1;j++){ if(distSeg(mx,my,o.puntos[j].x,o.puntos[j].y,o.puntos[j+1].x,o.puntos[j+1].y)<tol+3) return o; }
+    } else {
+      const c=cajaMundo(o); if(c && mx>=c.x-tol&&mx<=c.x+c.w+tol&&my>=c.y-tol&&my<=c.y+c.h+tol) return o;
+    }
+  }
+  return null;
+}
+function tiradorEn(mx,my){
+  if(seleccion.length!==1) return null;
+  const o=seleccion[0]; const tol=10/vista.escala;
+  const cerca=(x,y,id)=> (Math.hypot(mx-x,my-y)<tol)?id:null;
+  if(o.tipo==='pared'||o.tipo==='cota'){
+    return cerca(o.x1,o.y1,'p1')||cerca(o.x2,o.y2,'p2');
+  }
+  if(o.tipo==='habitacion'){
+    return cerca(o.x1,o.y1,'c11')||cerca(o.x2,o.y1,'c21')||cerca(o.x1,o.y2,'c12')||cerca(o.x2,o.y2,'c22');
+  }
+  return null;
+}
+function distSeg(px,py,x1,y1,x2,y2){
+  const A=px-x1,B=py-y1,C=x2-x1,D=y2-y1; const len=C*C+D*D; let t=len?(A*C+B*D)/len:0; t=Math.max(0,Math.min(1,t));
+  return Math.hypot(px-(x1+t*C),py-(y1+t*D));
+}
+
+/* =======================================================================
+   EVENTOS PUNTERO
+   ======================================================================= */
+function nombreDe(o){
+  if(o.tipo==='pared') return '🧱 Pared — '+fM(pxM(Math.hypot(o.x2-o.x1,o.y2-o.y1)));
+  if(o.tipo==='habitacion') return '⬛ Habitación '+(o.nombre?('“'+o.nombre+'” '):'')+fM(pxM(Math.abs(o.x2-o.x1)))+' × '+fM(pxM(Math.abs(o.y2-o.y1)));
+  if(o.tipo==='puerta') return '🚪 Puerta — '+fM(o.ancho||0.8);
+  if(o.tipo==='ventana') return '🪟 Ventana — '+fM(o.ancho||1.0);
+  if(o.tipo==='cota') return '📏 Medida — '+fM(pxM(Math.hypot(o.x2-o.x1,o.y2-o.y1)));
+  if(o.tipo==='texto') return '🔤 Texto: '+o.txt;
+  if(o.tipo==='cable') return '➰ Línea/cable';
+  if(o.tipo==='simbolo'){ const s=SIMBOLOS[o.clave]; const w=s.m[0]*(o.escalaX||o.escala||1), h=s.m[1]*(o.escalaY||o.escala||1); return (ICONOS_SIMB[o.clave]||'▫️')+' '+s.nombre+' — '+fM(w)+' × '+fM(h); }
+  return '';
+}
+function ocultarTooltip(){ const t=document.getElementById('tooltipElem'); if(t) t.style.display='none'; }
+lienzo.addEventListener('mouseleave', ocultarTooltip);
+
+function alPulsar(e){
+  e.preventDefault(); ocultarTooltip();
+  const {px,py}=eventoPos(e); const m=aMundo(px,py);
+  const sx=snap(m.x), sy=snap(m.y);
+
+  // Mover la vista: botón central (rueda) del ratón, o barra espaciadora + botón izquierdo
+  if(e.button===1 || (espacio && e.button===0)){
+    accion={tipo:'vista',px,py,ox:vista.x,oy:vista.y}; lienzo.style.cursor='grabbing'; return;
+  }
+  if(e.button!==undefined && e.button!==0) return; // ignorar otros botones (derecho, etc.)
+
+  if(herramienta==='mano'){ accion={tipo:'vista',px,py,ox:vista.x,oy:vista.y}; return; }
+
+  if(herramienta==='seleccionar'){
+    const tir=tiradorEn(m.x,m.y);
+    if(tir){ guardarHistorial(); accion={tipo:'tirador',id:tir,obj:seleccion[0]}; return; }
+    const o=objetoEn(m.x,m.y);
+    if(o){
+      if(!seleccion.includes(o)){ if(!e.shiftKey) seleccion=[]; seleccion.push(o); }
+      mostrarPropiedades();
+      guardarHistorial();
+      accion={tipo:'mover', px:m.x, py:m.y, copias:seleccion.map(s=>JSON.parse(JSON.stringify(s)))};
+    } else {
+      if(!e.shiftKey) seleccion=[];
+      accion={tipo:'banda', x0:m.x, y0:m.y, x1:m.x, y1:m.y};
+      mostrarPropiedades();
+    }
+    redibujar(); return;
+  }
+
+  if(herramienta==='pared'||herramienta==='habitacion'||herramienta==='cota'){
+    dibujando={id:idNuevo(), tipo:herramienta, capa:(herramienta==='cota'?'anotacion':'construccion'),
+               x1:sx,y1:sy,x2:sx,y2:sy, grosor:GROSOR_PARED};
+    return;
+  }
+  if(herramienta==='puerta'||herramienta==='ventana'){
+    guardarHistorial();
+    const ang=anguloParedCercana(m.x,m.y);
+    objetos.push({id:idNuevo(), tipo:herramienta, capa:'construccion', x:sx,y:sy, ang, ancho:herramienta==='puerta'?0.8:1.0});
+    seleccion=[objetos[objetos.length-1]]; mostrarPropiedades(); redibujar(); return;
+  }
+  if(herramienta==='simbolo'){
+    guardarHistorial();
+    const s=SIMBOLOS[simboloActivo];
+    objetos.push({id:idNuevo(), tipo:'simbolo', clave:simboloActivo, capa:s.capa, x:sx,y:sy, ang:0, escala:1, escalaX:1, escalaY:1});
+    seleccion=[objetos[objetos.length-1]]; mostrarPropiedades(); redibujar(); return;
+  }
+  if(herramienta==='texto'){
+    pendiente={x:sx,y:sy}; document.getElementById('entradaTexto').value=''; abrir('modalTexto');
+    setTimeout(()=>document.getElementById('entradaTexto').focus(),100); return;
+  }
+  if(herramienta==='cable'||herramienta==='cablered'){
+    const cap = herramienta==='cablered'?'datos':'electrico';
+    const tc  = herramienta==='cablered'?'datos':'normal';
+    if(!cableActual){ cableActual={id:idNuevo(),tipo:'cable',capa:cap,tipoCable:tc,puntos:[{x:sx,y:sy}]}; }
+    else { cableActual.puntos.push({x:sx,y:sy}); }
+    redibujar(); return;
+  }
+}
+
+function alMover(e){
+  const {px,py}=eventoPos(e); const m=aMundo(px,py);
+  // actualizar posición en estado siempre
+  document.getElementById('estPos').textContent = fM(pxM(m.x)).replace(' m','')+' ; '+fM(pxM(m.y));
+
+  if(!accion && !dibujando){
+    const tt=document.getElementById('tooltipElem');
+    if(herramienta==='seleccionar' && !espacio){
+      const tir=tiradorEn(m.x,m.y);
+      const o=tir?null:objetoEn(m.x,m.y);
+      lienzo.style.cursor = tir?'crosshair':(o?'move':'default');
+      if(o){ tt.textContent=nombreDe(o); tt.style.display='block'; tt.style.left=(px+16)+'px'; tt.style.top=(py+16)+'px'; }
+      else tt.style.display='none';
+    } else { tt.style.display='none'; }
+    return;
+  }
+  e.preventDefault();
+  const sx=snap(m.x), sy=snap(m.y);
+
+  if(dibujando){
+    let ex=sx, ey=sy;
+    if((ortho||e.shiftKey) && dibujando.tipo!=='habitacion'){
+      if(Math.abs(ex-dibujando.x1)>Math.abs(ey-dibujando.y1)) ey=dibujando.y1; else ex=dibujando.x1;
+    }
+    dibujando.x2=ex; dibujando.y2=ey; redibujar(); return;
+  }
+  if(accion.tipo==='vista'){ vista.x=accion.ox+(px-accion.px); vista.y=accion.oy+(py-accion.py); redibujar(); return; }
+  if(accion.tipo==='banda'){ accion.x1=m.x; accion.y1=m.y; redibujar(); return; }
+  if(accion.tipo==='mover'){
+    const ddx=m.x-accion.px, ddy=m.y-accion.py;
+    seleccion.forEach((o,i)=>{
+      const c=accion.copias[i];
+      if(o.x1!==undefined){ o.x1=snap(c.x1+ddx); o.y1=snap(c.y1+ddy); o.x2=snap(c.x2+ddx); o.y2=snap(c.y2+ddy); }
+      else if(o.puntos){ o.puntos=c.puntos.map(p=>({x:snap(p.x+ddx),y:snap(p.y+ddy)})); }
+      else { o.x=snap(c.x+ddx); o.y=snap(c.y+ddy); }
+    });
+    redibujar(); return;
+  }
+  if(accion.tipo==='tirador'){
+    const o=accion.obj;
+    if(accion.id==='p1'){ o.x1=sx; o.y1=sy; }
+    else if(accion.id==='p2'){ o.x2=sx; o.y2=sy; }
+    else if(accion.id==='c11'){ o.x1=sx; o.y1=sy; }
+    else if(accion.id==='c21'){ o.x2=sx; o.y1=sy; }
+    else if(accion.id==='c12'){ o.x1=sx; o.y2=sy; }
+    else if(accion.id==='c22'){ o.x2=sx; o.y2=sy; }
+    mostrarPropiedades(); redibujar(); return;
+  }
+}
+
+function alSoltar(e){
+  if(dibujando){
+    const largo=Math.hypot(dibujando.x2-dibujando.x1,dibujando.y2-dibujando.y1);
+    if(largo>GRID/3){ guardarHistorial(); objetos.push(dibujando); seleccion=[dibujando]; mostrarPropiedades(); }
+    dibujando=null; redibujar();
+  }
+  if(accion && accion.tipo==='banda'){
+    const x1=Math.min(accion.x0,accion.x1), x2=Math.max(accion.x0,accion.x1);
+    const y1=Math.min(accion.y0,accion.y1), y2=Math.max(accion.y0,accion.y1);
+    if(Math.abs(x2-x1)>5||Math.abs(y2-y1)>5){
+      seleccion=objetos.filter(o=>{ if(!CAPAS[o.capa].visible) return false; const c=cajaMundo(o); return c && c.x>=x1&&c.x+c.w<=x2&&c.y>=y1&&c.y+c.h<=y2; });
+      mostrarPropiedades();
+    }
+  }
+  accion=null; redibujar();
+  lienzo.style.cursor = espacio?'grab':(herramienta==='mano'?'grab':(herramienta==='seleccionar'?'default':'crosshair'));
+}
+
+function dibujarBanda(){
+  const a=aPantalla(Math.min(accion.x0,accion.x1),Math.min(accion.y0,accion.y1));
+  const w=Math.abs(accion.x1-accion.x0)*vista.escala, h=Math.abs(accion.y1-accion.y0)*vista.escala;
+  ctx.save(); ctx.fillStyle='rgba(37,99,235,.12)'; ctx.strokeStyle='#2563eb'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+  ctx.fillRect(a.x,a.y,w,h); ctx.strokeRect(a.x,a.y,w,h); ctx.restore();
+}
+
+function anguloParedCercana(mx,my){
+  let mejor=null, dmin=30/vista.escala;
+  objetos.filter(o=>o.tipo==='pared').forEach(o=>{
+    const d=distSeg(mx,my,o.x1,o.y1,o.x2,o.y2);
+    if(d<dmin){ dmin=d; mejor=o; }
+  });
+  if(mejor) return Math.atan2(mejor.y2-mejor.y1,mejor.x2-mejor.x1)*180/Math.PI;
+  return 0;
+}
+
+/* doble clic para terminar cable / editar texto */
+lienzo.addEventListener('dblclick',(e)=>{
+  const {px,py}=eventoPos(e); const m=aMundo(px,py); const o=objetoEn(m.x,m.y);
+  if(o && o.tipo==='simbolo' && (o.clave==='interruptor'||o.clave==='conmutador')){ guardarHistorial(); o.encendido=!(o.encendido!==false); seleccion=[o]; mostrarPropiedades(); redibujar(); return; }
+  terminarCable();
+});
+function terminarCable(){
+  if(cableActual){ if(cableActual.puntos.length>1){ guardarHistorial(); objetos.push(cableActual); } cableActual=null; redibujar(); }
+}
+
+lienzo.addEventListener('mousedown',alPulsar);
+window.addEventListener('mousemove',alMover);
+window.addEventListener('mouseup',alSoltar);
+lienzo.addEventListener('touchstart',alPulsar,{passive:false});
+lienzo.addEventListener('touchmove',alMover,{passive:false});
+lienzo.addEventListener('touchend',alSoltar);
+lienzo.addEventListener('wheel',e=>{ e.preventDefault(); zoomEnPunto(e.deltaY<0?1.12:0.89,e.offsetX,e.offsetY); },{passive:false});
+lienzo.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('keydown',e=>{ if(e.code==='Space' && !document.querySelector('.fondo-oscuro[style*="flex"]')){ espacio=true; if(herramienta==='seleccionar') lienzo.style.cursor='grab'; } });
+window.addEventListener('keyup',e=>{ if(e.code==='Space'){ espacio=false; if(!accion) lienzo.style.cursor = herramienta==='mano'?'grab':(herramienta==='seleccionar'?'default':'crosshair'); } });
+
+/* =======================================================================
+   TECLADO
+   ======================================================================= */
+window.addEventListener('keydown',e=>{
+  if(document.querySelector('.fondo-oscuro[style*="flex"]')) return; // modal abierto
+  if(e.key==='Delete'||e.key==='Backspace'){ if(seleccion.length){ borrarSeleccion(); e.preventDefault(); } }
+  else if(e.key==='Enter'){ terminarCable(); }
+  else if(e.key==='Escape'){ seleccion=[]; cableActual=null; dibujando=null; mostrarPropiedades(); redibujar(); }
+  else if(e.ctrlKey && e.key.toLowerCase()==='z'){ deshacer(); e.preventDefault(); }
+  else if(e.ctrlKey && e.key.toLowerCase()==='y'){ rehacerAccion(); e.preventDefault(); }
+  else if(e.ctrlKey && e.key.toLowerCase()==='d'){ duplicar(); e.preventDefault(); }
+  else if(e.ctrlKey && e.key.toLowerCase()==='s'){ abrirGuardar(); e.preventDefault(); }
+  else if(e.key.toLowerCase()==='r' && seleccion.length){ rotarSeleccion(15); }
+});
+
+/* =======================================================================
+   HERRAMIENTAS / PROPIEDADES
+   ======================================================================= */
+function elegir(h){
+  herramienta=h; simboloActivo=null; terminarCable();
+  document.querySelectorAll('.hbtn').forEach(b=>b.classList.toggle('activa', b.dataset.h===h));
+  document.getElementById('ayuda').textContent=AYUDAS[h]||'';
+  lienzo.style.cursor = h==='mano'?'grab':(h==='seleccionar'?'default':'crosshair');
+  if(h!=='seleccionar'){ seleccion=[]; mostrarPropiedades(); }
+  if(esMovil()) cerrarDrawers();
+  redibujar();
+}
+function elegirSimbolo(k){
+  herramienta='simbolo'; simboloActivo=k; terminarCable();
+  document.querySelectorAll('.hbtn').forEach(b=>b.classList.toggle('activa', b.dataset.simbolo===k));
+  document.getElementById('ayuda').textContent='Colocar: '+SIMBOLOS[k].nombre+'. '+AYUDAS.simbolo;
+  lienzo.style.cursor='crosshair'; seleccion=[]; mostrarPropiedades();
+  if(esMovil()) cerrarDrawers();
+}
+
+/* ---- cajones (menús ocultables) en móvil ---- */
+function esMovil(){ return window.matchMedia('(max-width:760px)').matches; }
+function toggleDrawer(cual){
+  const el=document.getElementById(cual); if(!el) return;
+  const otro=document.getElementById(cual==='herramientas'?'propiedades':'herramientas');
+  if(otro) otro.classList.remove('abierto');
+  document.getElementById('menuApp').classList.remove('abierto');
+  const ab=el.classList.toggle('abierto');
+  document.getElementById('drawerBack').classList.toggle('activo', ab);
+}
+function toggleMenu(){
+  document.getElementById('herramientas').classList.remove('abierto');
+  document.getElementById('propiedades').classList.remove('abierto');
+  const ab=document.getElementById('menuApp').classList.toggle('abierto');
+  document.getElementById('drawerBack').classList.toggle('activo', ab);
+}
+function cerrarDrawers(){
+  document.getElementById('herramientas').classList.remove('abierto');
+  document.getElementById('propiedades').classList.remove('abierto');
+  document.getElementById('menuApp').classList.remove('abierto');
+  document.getElementById('drawerBack').classList.remove('activo');
+}
+/* en móvil mete las acciones de cabecera y la barra de plantas dentro del menú ☰ */
+let _hacc, _barra, _origHacc, _origBarra, _menuApp;
+function aplicarLayout(){
+  if(!_hacc){ _hacc=document.getElementById('headerAcciones'); _barra=document.getElementById('barraPlantas'); _menuApp=document.getElementById('menuApp');
+    _origHacc={p:_hacc.parentNode, n:_hacc.nextSibling}; _origBarra={p:_barra.parentNode, n:_barra.nextSibling};
+    _menuApp.addEventListener('click', e=>{ const b=e.target.closest('button'); if(b && !b.classList.contains('toggle')) cerrarDrawers(); });
+  }
+  if(esMovil()){
+    if(_hacc.parentNode!==_menuApp) _menuApp.appendChild(_hacc);
+    if(_barra.parentNode!==_menuApp) _menuApp.appendChild(_barra);
+  } else {
+    cerrarDrawers();
+    if(_hacc.parentNode===_menuApp) _origHacc.p.insertBefore(_hacc, _origHacc.n);
+    if(_barra.parentNode===_menuApp) _origBarra.p.insertBefore(_barra, _origBarra.n);
+  }
+  ajustarTamano();
+}
+window.addEventListener('resize', aplicarLayout);
+
+function mostrarPropiedades(){
+  const cont=document.getElementById('panelPropiedades');
+  const fp=document.getElementById('fabProps'); if(fp) fp.classList.toggle('hay', seleccion.length>0);
+  if(simulando) simRes=calcularSim();
+  if(simRed) redRes=calcularRed();
+  if(seleccion.length===0){ cont.innerHTML='<div class="prop-vacio">Selecciona algo del plano para ver y cambiar sus datos.</div>'; return; }
+  if(seleccion.length>1){
+    cont.innerHTML=`<div class="prop-fila"><b>${seleccion.length} elementos seleccionados</b></div>
+      <div class="prop-acciones">
+        <button class="btn-amarillo" onclick="rotarSeleccion(15)">↻ Girar</button>
+        <button onclick="duplicar()">⧉ Duplicar</button>
+        <button class="btn-rojo" style="grid-column:1/3" onclick="borrarSeleccion()">🗑️ Borrar</button>
+      </div>`;
+    return;
+  }
+  const o=seleccion[0]; let html='';
+  if(o.tipo==='habitacion'){
+    html+=propTexto('Nombre','nombre',o.nombre||'');
+    html+=propNum('Ancho (m)','anchoM',Math.round(pxM(Math.abs(o.x2-o.x1))*100)/100);
+    html+=propNum('Alto (m)','altoM',Math.round(pxM(Math.abs(o.y2-o.y1))*100)/100);
+  } else if(o.tipo==='pared'){
+    html+=propNum('Largo (m)','largoM',Math.round(pxM(Math.hypot(o.x2-o.x1,o.y2-o.y1))*100)/100);
+    html+=propNum('Grosor (cm)','grosorCm',Math.round(pxM(o.grosor||GROSOR_PARED)*100));
+  } else if(o.tipo==='texto'){
+    html+=propTexto('Texto','txt',o.txt);
+    html+=propNum('Tamaño','tam',o.tam||16);
+  } else if(o.tipo==='puerta'||o.tipo==='ventana'){
+    html+=propNum('Ancho (m)','ancho',o.ancho||0.8);
+    html+=propNum('Giro (°)','ang',Math.round(o.ang||0));
+  } else if(o.tipo==='simbolo'){
+    const s=SIMBOLOS[o.clave];
+    html+=`<div class="prop-fila"><b>${s.nombre}</b><label>Tamaño normal: ${fM(s.m[0])} × ${fM(s.m[1])}</label></div>`;
+    if(o.clave==='interruptor'||o.clave==='conmutador'){
+      const onSw=o.encendido!==false;
+      html+=`<button class="${onSw?'btn-verde':'btn-rojo'}" style="width:100%;margin-bottom:6px" onclick="toggleInterruptor('${o.id}')">${onSw?'🟢 Encendido — tocar para apagar':'🔴 Apagado — tocar para encender'}</button>`;
+    }
+    if(o.clave==='cuadro'){
+      html+=propNum('Voltios (V)','voltaje',o.voltaje||230);
+      html+=propNum('Amperios máx (A)','amperaje',o.amperaje||25);
+    }
+    if(o.clave==='luz'||o.clave==='aplique'){ html+=propNum('Potencia (W)','vatios',o.vatios||60); }
+    if(o.clave==='enchufe'||o.clave==='enchufe2'){ html+=propNum('Consumo (W)','vatios',o.vatios||0); }
+    if(o.capa==='electrico' && simRes){
+      const en=simRes.devEn.get(o.id);
+      html+=`<div class="prop-fila"><label>Estado: <b style="color:${en?'#16a34a':'#94a3b8'}">${en?'⚡ Con corriente':'⭘ Sin corriente'}</b></label></div>`;
+    }
+    if(o.clave==='router'){
+      html+=propTexto('Nombre WiFi (SSID)','ssid',o.ssid||'MiCasa');
+      html+=propTexto('IP / puerta enlace','ip',o.ip||'192.168.1.1');
+      html+=propNum('Alcance WiFi (m)','alcance',o.alcance||12);
+    }
+    if(o.clave==='ap'){ html+=propNum('Alcance WiFi (m)','alcance',o.alcance||10); }
+    if(o.clave==='plc'){ html+=`<div class="prop-fila"><label style="color:#94a3b8;font-size:12px">El PLC lleva la red a otra zona usando los cables eléctricos. Conéctalo al router con cable de red y pon otro PLC en el mismo circuito eléctrico.</label></div>`; }
+    if(o.capa==='datos' && redRes){
+      const info=redRes.sig.get(o.id);
+      let txt='❌ Sin conexión';
+      if(info){ txt = info.tipo==='router'?'📡 Fuente de internet' : info.tipo==='cable'?'🔌 Conectado por cable (100%)' : info.tipo==='wifi'?(info.pct>=15?('📶 WiFi '+info.pct+'%'):('📶 WiFi '+info.pct+'% — muy débil')) : '❌ Sin conexión'; }
+      const colE = (info&&(info.tipo==='router'||info.tipo==='cable'))?'#16a34a':(info&&info.pct>=40?'#16a34a':info&&info.pct>=15?'#ea580c':'#dc2626');
+      html+=`<div class="prop-fila"><label>Conexión: <b style="color:${colE}">${txt}</b></label></div>`;
+    }
+    html+=propNum('Ancho (m)','anchoSimb',Math.round(s.m[0]*(o.escalaX||o.escala||1)*100)/100);
+    html+=propNum('Alto (m)','altoSimb',Math.round(s.m[1]*(o.escalaY||o.escala||1)*100)/100);
+    html+=propNum('Giro (°)','ang',Math.round(o.ang||0));
+  } else if(o.tipo==='cable'){
+    html+=propSelect('Tipo de cable','tipoCable',o.tipoCable||'normal',TIPOS_CABLE);
+    if(simRes){ const on=o.puntos.some((_,i)=>i<o.puntos.length-1 && simRes.edgeKey.get(o.id+'_'+i));
+      html+=`<div class="prop-fila"><label>Estado: <b style="color:${on?'#16a34a':'#94a3b8'}">${on?'⚡ Con corriente':'⭘ Sin corriente'}</b></label></div>`; }
+  } else if(o.tipo==='cota'){
+    html+=`<div class="prop-fila"><b>Medida: ${fM(pxM(Math.hypot(o.x2-o.x1,o.y2-o.y1)))}</b></div>`;
+  }
+  html+=`<div class="prop-acciones" style="margin-top:6px;">
+    <button class="btn-amarillo" onclick="rotarSeleccion(15)">↻ +15°</button>
+    <button class="btn-amarillo" onclick="rotarSeleccion(-15)">↺ -15°</button>
+    <button class="btn-amarillo" onclick="rotarSeleccion(90)" style="grid-column:1/3">↻ Girar 90°</button>
+    <button onclick="duplicar()">⧉ Duplicar</button>
+    <button onclick="alFrente()">⬆️ Frente</button>
+    <button onclick="alFondo()">⬇️ Fondo</button>
+    <button class="btn-rojo" onclick="borrarSeleccion()">🗑️ Borrar</button>
+  </div>`;
+  cont.innerHTML=html;
+}
+function propTexto(lbl,campo,val){ return `<div class="prop-fila"><label>${lbl}</label><input type="text" value="${(''+val).replace(/"/g,'&quot;')}" oninput="editarProp('${campo}',this.value)"></div>`; }
+function propNum(lbl,campo,val){ return `<div class="prop-fila"><label>${lbl}</label><input type="text" inputmode="decimal" value="${(''+val).replace('.',',')}" onchange="editarProp('${campo}',this.value)"></div>`; }
+function propSelect(lbl,campo,val,opts){ return `<div class="prop-fila"><label>${lbl}</label><select onchange="editarProp('${campo}',this.value)">${opts.map(o=>`<option value="${o[0]}" ${o[0]===val?'selected':''}>${o[1]}</option>`).join('')}</select></div>`; }
+function toggleInterruptor(id){ const o=objetos.find(x=>x.id===id); if(!o) return; guardarHistorial(); o.encendido=!(o.encendido!==false); mostrarPropiedades(); redibujar(); }
+function alternarSim(){ simulando=!simulando; document.getElementById('tgSim').classList.toggle('on',simulando); mostrarPropiedades(); redibujar(); }
+function alternarRed(){ simRed=!simRed; document.getElementById('tgRed').classList.toggle('on',simRed); mostrarPropiedades(); redibujar(); }
+
+function editarProp(campo,valor){
+  const o=seleccion[0]; if(!o) return; guardarHistorial();
+  const num=parseFloat((''+valor).replace(',','.'));
+  if(campo==='nombre'){ o.nombre=valor; }
+  else if(campo==='txt'){ o.txt=valor; }
+  else if(campo==='tam'){ o.tam=num||16; }
+  else if(campo==='ancho'){ o.ancho=num||0.8; }
+  else if(campo==='ang'){ o.ang=num||0; }
+  else if(campo==='escalaPct'){ o.escala=(num||100)/100; o.escalaX=o.escala; o.escalaY=o.escala; }
+  else if(campo==='anchoSimb'){ const s=SIMBOLOS[o.clave]; o.escalaX=(num||s.m[0])/s.m[0]; }
+  else if(campo==='altoSimb'){ const s=SIMBOLOS[o.clave]; o.escalaY=(num||s.m[1])/s.m[1]; }
+  else if(campo==='grosorCm'){ o.grosor=mPx((num||10)/100); }
+  else if(campo==='tipoCable'){ o.tipoCable=valor; }
+  else if(campo==='ssid'){ o.ssid=valor; }
+  else if(campo==='ip'){ o.ip=valor; }
+  else if(campo==='alcance'){ o.alcance=num||10; }
+  else if(campo==='voltaje'){ o.voltaje=num||230; }
+  else if(campo==='amperaje'){ o.amperaje=num||25; }
+  else if(campo==='vatios'){ o.vatios=isNaN(num)?0:num; }
+  else if(campo==='anchoM'){ const x=Math.min(o.x1,o.x2); o.x1=x; o.x2=x+mPx(num); }
+  else if(campo==='altoM'){ const y=Math.min(o.y1,o.y2); o.y1=y; o.y2=y+mPx(num); }
+  else if(campo==='largoM'){ const ang=Math.atan2(o.y2-o.y1,o.x2-o.x1); o.x2=o.x1+mPx(num)*Math.cos(ang); o.y2=o.y1+mPx(num)*Math.sin(ang); }
+  redibujar();
+}
+
+/* =======================================================================
+   ACCIONES
+   ======================================================================= */
+function _rot(x,y,a){ return {x:x*Math.cos(a)-y*Math.sin(a), y:x*Math.sin(a)+y*Math.cos(a)}; }
+function rotarSeleccion(g){
+  if(!seleccion.length) return; guardarHistorial();
+  const a=g*Math.PI/180;
+  seleccion.forEach(o=>{
+    if(o.tipo==='simbolo'||o.tipo==='puerta'||o.tipo==='ventana'){ o.ang=(((o.ang||0)+g)%360+360)%360; }
+    else if(o.tipo==='pared'||o.tipo==='cota'){
+      const cx=(o.x1+o.x2)/2, cy=(o.y1+o.y2)/2;
+      let r=_rot(o.x1-cx,o.y1-cy,a); o.x1=cx+r.x; o.y1=cy+r.y;
+      r=_rot(o.x2-cx,o.y2-cy,a); o.x2=cx+r.x; o.y2=cy+r.y;
+    }
+    else if(o.tipo==='cable' && o.puntos.length){
+      const cx=o.puntos.reduce((s,p)=>s+p.x,0)/o.puntos.length, cy=o.puntos.reduce((s,p)=>s+p.y,0)/o.puntos.length;
+      o.puntos=o.puntos.map(p=>{ const r=_rot(p.x-cx,p.y-cy,a); return {x:cx+r.x, y:cy+r.y}; });
+    }
+    else if(o.tipo==='habitacion'){ // las habitaciones son rectas; girar 90° intercambia ancho y alto
+      if(Math.abs(g)>=90){ const w=Math.abs(o.x2-o.x1), h=Math.abs(o.y2-o.y1); const x=Math.min(o.x1,o.x2), y=Math.min(o.y1,o.y2); o.x1=x; o.y1=y; o.x2=x+h; o.y2=y+w; }
+    }
+  });
+  mostrarPropiedades(); redibujar();
+}
+function duplicar(){ if(!seleccion.length) return; guardarHistorial(); const nuevos=seleccion.map(o=>{ const c=JSON.parse(JSON.stringify(o)); c.id=idNuevo(); if(c.x1!==undefined){c.x1+=GRID/2;c.x2+=GRID/2;c.y1+=GRID/2;c.y2+=GRID/2;} else if(c.x!==undefined){c.x+=GRID/2;c.y+=GRID/2;} objetos.push(c); return c; }); seleccion=nuevos; mostrarPropiedades(); redibujar(); }
+function alFrente(){ if(seleccion.length!==1) return; guardarHistorial(); const o=seleccion[0]; setObjetos(objetos.filter(x=>x!==o)); objetos.push(o); redibujar(); }
+function alFondo(){ if(seleccion.length!==1) return; guardarHistorial(); const o=seleccion[0]; setObjetos(objetos.filter(x=>x!==o)); objetos.unshift(o); redibujar(); }
+function borrarSeleccion(){ if(!seleccion.length) return; guardarHistorial(); setObjetos(objetos.filter(o=>!seleccion.includes(o))); seleccion=[]; mostrarPropiedades(); redibujar(); }
+
+/* =======================================================================
+   VISTA 3D (Three.js) — levanta las paredes y apila las plantas
+   ======================================================================= */
+let r3d={ren:null,scene:null,cam:null,anim:null,theta:Math.PI*0.85,phi:Math.PI*0.34,radius:20,target:null,drag:false,lx:0,ly:0,_ctrl:false};
+const ALT_PARED=2.5, GAP_PLANTA=0.5;
+const ALT_MUEBLE={camadoble:0.55,camaind:0.55,sofa:0.85,mesa:0.75,silla:0.95,armario:2.0,nevera:1.7,cocina:0.9,lavadora:0.85,tv:0.6};
+const ALT_SANIT={inodoro:0.4,lavabo:0.85,bidet:0.4,ducha:0.06,banera:0.55,fregadero:0.9};
+const COL_CAPA3D={electrico:0x16a34a, datos:0x7c3aed, fontaneria:0x0ea5e9, anotacion:0xdc2626};
+
+function abrir3D(){
+  if(typeof THREE==='undefined'){ alert('No se pudo cargar el 3D (falta la librería en la carpeta lib/three).'); return; }
+  document.getElementById('modal3d').style.display='flex';
+  setTimeout(construir3D, 40);   // esperar a que el contenedor tenga tamaño
+}
+function cerrar3D(){
+  document.getElementById('modal3d').style.display='none';
+  if(r3d.anim){ cancelAnimationFrame(r3d.anim); r3d.anim=null; }
+  window.removeEventListener('resize', resize3d);
+}
+function construir3D(){
+  const cont=document.getElementById('lienzo3d-cont');
+  const W=cont.clientWidth||800, H=cont.clientHeight||600;
+  if(r3d.anim){ cancelAnimationFrame(r3d.anim); r3d.anim=null; }
+  if(r3d.ren){ try{ r3d.ren.dispose(); r3d.ren.forceContextLoss(); }catch(e){} }
+  [...cont.querySelectorAll('canvas')].forEach(c=>c.remove());
+  const scene=new THREE.Scene(); scene.background=new THREE.Color(0xeaf0f7);
+  const cam=new THREE.PerspectiveCamera(55, W/H, 0.05, 3000);
+  let ren; try{ ren=new THREE.WebGLRenderer({antialias:true}); }catch(e){ alert('Tu equipo no puede mostrar 3D (WebGL no disponible).'); cerrar3D(); return; }
+  ren.setPixelRatio(window.devicePixelRatio||1); ren.setSize(W,H);
+  cont.insertBefore(ren.domElement, cont.firstChild);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x8a8a99,1.0));
+  const dir=new THREE.DirectionalLight(0xffffff,0.55); dir.position.set(8,16,10); scene.add(dir);
+
+  const mWall=new THREE.MeshLambertMaterial({color:0xd9dee6});
+  const mSan=new THREE.MeshLambertMaterial({color:0xeaf6fb});
+  const mFloor=new THREE.MeshLambertMaterial({color:0xc7d2e0});
+  const mFurn=new THREE.MeshLambertMaterial({color:0xb08968});
+  const bb={minx:1e9,minz:1e9,maxx:-1e9,maxz:-1e9,maxy:0};
+  const exp=(x,z)=>{ bb.minx=Math.min(bb.minx,x); bb.maxx=Math.max(bb.maxx,x); bb.minz=Math.min(bb.minz,z); bb.maxz=Math.max(bb.maxz,z); };
+  function muro(x1,y1,x2,y2,gM,h,baseY){
+    const ax=pxM(x1),az=pxM(y1),bx=pxM(x2),bz=pxM(y2); const dx=bx-ax,dz=bz-az; const len=Math.hypot(dx,dz); if(len<0.02) return;
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(len,h,Math.max(0.05,gM)), mWall);
+    mesh.position.set((ax+bx)/2, baseY+h/2, (az+bz)/2); mesh.rotation.y=-Math.atan2(dz,dx); scene.add(mesh);
+    exp(ax,az); exp(bx,bz); bb.maxy=Math.max(bb.maxy, baseY+h);
+  }
+  plantas.forEach((pl,pi)=>{
+    const baseY=pi*(ALT_PARED+GAP_PLANTA);
+    pl.objetos.forEach(o=>{
+      const gM=pxM(o.grosor||GROSOR_PARED);
+      if(o.tipo==='pared'){ muro(o.x1,o.y1,o.x2,o.y2,gM,ALT_PARED,baseY); }
+      else if(o.tipo==='habitacion'){
+        const x1=Math.min(o.x1,o.x2),x2=Math.max(o.x1,o.x2),y1=Math.min(o.y1,o.y2),y2=Math.max(o.y1,o.y2);
+        muro(x1,y1,x2,y1,gM,ALT_PARED,baseY); muro(x2,y1,x2,y2,gM,ALT_PARED,baseY);
+        muro(x2,y2,x1,y2,gM,ALT_PARED,baseY); muro(x1,y2,x1,y1,gM,ALT_PARED,baseY);
+        const slab=new THREE.Mesh(new THREE.BoxGeometry(pxM(x2-x1),0.06,pxM(y2-y1)), mFloor);
+        slab.position.set(pxM((x1+x2)/2), baseY+0.03, pxM((y1+y2)/2)); scene.add(slab);
+      }
+      else if(o.tipo==='puerta'){
+        const wt=pxM(o.grosor||GROSOR_PARED), ang=(o.ang||0)*Math.PI/180, an=o.ancho||0.8;
+        const mx=pxM(o.x)+an/2*Math.cos(ang), mz=pxM(o.y)+an/2*Math.sin(ang);
+        const m=new THREE.Mesh(new THREE.BoxGeometry(an,2.02,wt+0.1), new THREE.MeshLambertMaterial({color:0x9c6b3f}));
+        m.position.set(mx, baseY+1.01, mz); m.rotation.y=-ang; scene.add(m); exp(mx,mz);
+      }
+      else if(o.tipo==='ventana'){
+        const wt=pxM(o.grosor||GROSOR_PARED), ang=(o.ang||0)*Math.PI/180, an=o.ancho||1.0;
+        const mx=pxM(o.x)+an/2*Math.cos(ang), mz=pxM(o.y)+an/2*Math.sin(ang);
+        const m=new THREE.Mesh(new THREE.BoxGeometry(an,1.0,wt+0.12), new THREE.MeshLambertMaterial({color:0x9cd3ec, transparent:true, opacity:0.6}));
+        m.position.set(mx, baseY+1.4, mz); m.rotation.y=-ang; scene.add(m); exp(mx,mz);
+      }
+      else if(o.tipo==='simbolo' && (o.capa==='muebles'||o.capa==='fontaneria')){
+        const s=SIMBOLOS[o.clave]; const wm=s.m[0]*(o.escalaX||o.escala||1), dm=s.m[1]*(o.escalaY||o.escala||1);
+        const h=(o.capa==='muebles')?(ALT_MUEBLE[o.clave]||0.6):(ALT_SANIT[o.clave]||0.5);
+        const mesh=new THREE.Mesh(new THREE.BoxGeometry(wm,h,dm), o.capa==='muebles'?mFurn:mSan);
+        mesh.position.set(pxM(o.x), baseY+h/2, pxM(o.y)); mesh.rotation.y=-(o.ang||0)*Math.PI/180; scene.add(mesh);
+        exp(pxM(o.x),pxM(o.y));
+      }
+      else if(o.tipo==='simbolo'){   // eléctrico / datos: marcadores
+        const col=COL_CAPA3D[o.capa]||0x888888; let mesh;
+        if(o.clave==='luz'||o.clave==='aplique'){
+          mesh=new THREE.Mesh(new THREE.SphereGeometry(0.13,12,10), new THREE.MeshLambertMaterial({color:0xf6c343, emissive:0x5a4500}));
+          mesh.position.set(pxM(o.x), baseY+ALT_PARED-0.16, pxM(o.y));
+        } else if(o.clave==='subida'||o.clave==='subidared'){
+          mesh=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,ALT_PARED,10), new THREE.MeshLambertMaterial({color:col}));
+          mesh.position.set(pxM(o.x), baseY+ALT_PARED/2, pxM(o.y));
+        } else if(o.clave==='cuadro'){
+          mesh=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.42,0.12), new THREE.MeshLambertMaterial({color:0xdc2626}));
+          mesh.position.set(pxM(o.x), baseY+1.45, pxM(o.y));
+        } else if(o.clave==='pc'){
+          mesh=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.30,0.06), new THREE.MeshLambertMaterial({color:0x334155}));
+          mesh.position.set(pxM(o.x), baseY+0.9, pxM(o.y));
+        } else {
+          const alto=(o.clave==='router'||o.clave==='ap'||o.clave==='switchred')?1.4:0.32;
+          mesh=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.18,0.1), new THREE.MeshLambertMaterial({color:col}));
+          mesh.position.set(pxM(o.x), baseY+alto, pxM(o.y));
+        }
+        mesh.rotation.y=-(o.ang||0)*Math.PI/180; scene.add(mesh); exp(pxM(o.x),pxM(o.y));
+      }
+    });
+  });
+  if(bb.minx>bb.maxx){ bb.minx=-2;bb.maxx=2;bb.minz=-2;bb.maxz=2; }
+  const cx=(bb.minx+bb.maxx)/2, cz=(bb.minz+bb.maxz)/2;
+  const span=Math.max(bb.maxx-bb.minx, bb.maxz-bb.minz, 4);
+  const piso=new THREE.Mesh(new THREE.BoxGeometry(span*2.4,0.04,span*2.4), new THREE.MeshLambertMaterial({color:0xe2e8f0}));
+  piso.position.set(cx,-0.03,cz); scene.add(piso);
+
+  r3d.scene=scene; r3d.cam=cam; r3d.ren=ren;
+  r3d.target=new THREE.Vector3(cx, bb.maxy*0.35, cz);
+  r3d.radius=Math.max(6, span*1.5 + bb.maxy);
+  r3d.theta=Math.PI*0.85; r3d.phi=Math.PI*0.34;
+  pasarCamara(); ponerControles3D(ren.domElement);
+  window.addEventListener('resize', resize3d);
+  animar3d();
+}
+function pasarCamara(){
+  if(!r3d.cam||!r3d.target) return; const t=r3d.target;
+  r3d.cam.position.set(t.x + r3d.radius*Math.sin(r3d.phi)*Math.cos(r3d.theta), t.y + r3d.radius*Math.cos(r3d.phi), t.z + r3d.radius*Math.sin(r3d.phi)*Math.sin(r3d.theta));
+  r3d.cam.lookAt(t);
+}
+function animar3d(){ r3d.anim=requestAnimationFrame(animar3d); r3d.ren.render(r3d.scene, r3d.cam); }
+function resize3d(){ const cont=document.getElementById('lienzo3d-cont'); if(!r3d.ren||!cont) return; const W=cont.clientWidth,H=cont.clientHeight; if(!W||!H) return; r3d.cam.aspect=W/H; r3d.cam.updateProjectionMatrix(); r3d.ren.setSize(W,H); }
+function ponerControles3D(dom){
+  dom.style.touchAction='none';
+  dom.onpointerdown=e=>{ r3d.drag=true; r3d.lx=e.clientX; r3d.ly=e.clientY; };
+  dom.onwheel=e=>{ e.preventDefault(); r3d.radius=Math.max(2, Math.min(600, r3d.radius*(e.deltaY>0?1.12:0.89))); pasarCamara(); };
+  if(!r3d._ctrl){
+    window.addEventListener('pointermove', e=>{ if(!r3d.drag||!r3d.cam) return; const dx=e.clientX-r3d.lx, dy=e.clientY-r3d.ly; r3d.lx=e.clientX; r3d.ly=e.clientY; r3d.theta-=dx*0.006; r3d.phi=Math.max(0.08, Math.min(Math.PI*0.49, r3d.phi-dy*0.006)); pasarCamara(); });
+    window.addEventListener('pointerup', ()=>{ r3d.drag=false; });
+    r3d._ctrl=true;
+  }
+}
+
+/* =======================================================================
+   ZOOM / VISTA
+   ======================================================================= */
+function zoom(f){ zoomEnPunto(f,anchoCss()/2,altoCss()/2); }
+function zoomEnPunto(f,px,py){ const antes=aMundo(px,py); vista.escala=Math.max(0.15,Math.min(6,vista.escala*f)); const desp=aMundo(px,py); vista.x+=(desp.x-antes.x)*vista.escala; vista.y+=(desp.y-antes.y)*vista.escala; redibujar(); }
+function centrarVista(){ vista={x:anchoCss()/2,y:altoCss()/2,escala:1}; redibujar(); }
+function ajustarVista(){
+  if(!objetos.length){ centrarVista(); return; }
+  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
+  objetos.forEach(o=>{ const c=cajaMundo(o); if(c){ x1=Math.min(x1,c.x); y1=Math.min(y1,c.y); x2=Math.max(x2,c.x+c.w); y2=Math.max(y2,c.y+c.h); } });
+  const w=x2-x1||1, h=y2-y1||1; const m=60;
+  const esc=Math.min((anchoCss()-2*m)/w,(altoCss()-2*m)/h,4);
+  vista.escala=Math.max(0.15,esc);
+  vista.x=anchoCss()/2-(x1+w/2)*vista.escala; vista.y=altoCss()/2-(y1+h/2)*vista.escala;
+  redibujar();
+}
+
+/* =======================================================================
+   TOGGLES / ESCALA
+   ======================================================================= */
+function alternarRejilla(){ verRejilla=!verRejilla; document.getElementById('tgRejilla').classList.toggle('on',verRejilla); redibujar(); }
+function alternarIman(){ imanRejilla=!imanRejilla; document.getElementById('tgIman').classList.toggle('on',imanRejilla); }
+function alternarOrtho(){ ortho=!ortho; document.getElementById('tgOrtho').classList.toggle('on',ortho); }
+function cambiarEscala(v){ metrosPorCuadro=parseFloat(v); redibujar(); }
+function actualizarEstado(){
+  document.getElementById('estZoom').textContent=Math.round(vista.escala*100)+'%';
+  document.getElementById('estEscala').textContent=fM(metrosPorCuadro)+'/cuadro';
+  let area=0; objetos.filter(o=>o.tipo==='habitacion').forEach(o=>area+=pxM(Math.abs(o.x2-o.x1))*pxM(Math.abs(o.y2-o.y1)));
+  document.getElementById('estArea').textContent=fM2(area);
+}
+
+/* =======================================================================
+   TEXTO
+   ======================================================================= */
+function confirmarTexto(){ const t=document.getElementById('entradaTexto').value.trim(); if(t&&pendiente){ guardarHistorial(); const o={id:idNuevo(),tipo:'texto',capa:'anotacion',x:pendiente.x,y:pendiente.y,txt:t,tam:16}; objetos.push(o); seleccion=[o]; mostrarPropiedades(); redibujar(); } cerrar('modalTexto'); pendiente=null; }
+
+/* =======================================================================
+   HISTORIAL
+   ======================================================================= */
+function guardarHistorial(){ historial.push(JSON.stringify(objetos)); if(historial.length>80) historial.shift(); rehacer.length=0; autoguardar(); }
+function deshacer(){ if(historial.length){ rehacer.push(JSON.stringify(objetos)); setObjetos(JSON.parse(historial.pop())); seleccion=[]; mostrarPropiedades(); redibujar(); } }
+function rehacerAccion(){ if(rehacer.length){ historial.push(JSON.stringify(objetos)); setObjetos(JSON.parse(rehacer.pop())); seleccion=[]; mostrarPropiedades(); redibujar(); } }
+
+/* =======================================================================
+   GUARDAR / CARGAR (varios planos + miniatura)
+   ======================================================================= */
+const CLAVE='misPlanos_v2';
+let nombreActual='';
+function planos(){ try{return JSON.parse(localStorage.getItem(CLAVE))||{};}catch(e){return {};} }
+function setPlanos(p){ localStorage.setItem(CLAVE,JSON.stringify(p)); }
+function autoguardar(){ localStorage.setItem('planoBorrador',JSON.stringify({plantas:plantas.map(p=>({nombre:p.nombre,objetos:p.objetos})), plantaActual, metrosPorCuadro})); }
+
+/* ---- gestión de plantas ---- */
+function cambiarPlanta(i){ if(i<0||i>=plantas.length) return; plantaActual=i; objetos=plantas[i].objetos; historial.length=0; rehacer.length=0; seleccion=[]; actualizarPlantas(); mostrarPropiedades(); redibujar(); }
+function nuevaPlanta(){ plantas.push({nombre:'Planta '+plantas.length, objetos:[]}); autoguardar(); cambiarPlanta(plantas.length-1); }
+function duplicarPlanta(){ const copia=JSON.parse(JSON.stringify(plantas[plantaActual].objetos)); copia.forEach(o=>o.id=idNuevo()); plantas.push({nombre:plantas[plantaActual].nombre+' (copia)', objetos:copia}); autoguardar(); cambiarPlanta(plantas.length-1); }
+function renombrarPlanta(){ const n=prompt('Nombre de la planta:', plantas[plantaActual].nombre); if(n && n.trim()){ plantas[plantaActual].nombre=n.trim(); actualizarPlantas(); autoguardar(); } }
+function borrarPlanta(){ if(plantas.length<=1){ alert('Tiene que haber al menos una planta.'); return; } if(confirm('¿Borrar la planta "'+plantas[plantaActual].nombre+'"?')){ plantas.splice(plantaActual,1); autoguardar(); cambiarPlanta(Math.max(0,plantaActual-1)); } }
+function alternarInferior(){ verInferior=!verInferior; document.getElementById('tgInferior').classList.toggle('on',verInferior); redibujar(); }
+function actualizarPlantas(){
+  const sel=document.getElementById('selPlanta'); if(!sel) return; sel.innerHTML='';
+  plantas.forEach((p,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=p.nombre; if(i===plantaActual)o.selected=true; sel.appendChild(o); });
+  const tg=document.getElementById('tgInferior'); if(tg) tg.style.opacity = plantaActual>0?'1':'.45';
+}
+
+function abrirGuardar(){ document.getElementById('nombrePlano').value=nombreActual||''; abrir('modalGuardar'); setTimeout(()=>document.getElementById('nombrePlano').focus(),100); }
+function confirmarGuardar(){
+  const nombre=document.getElementById('nombrePlano').value.trim();
+  if(!nombre){ alert('Ponle un nombre al plano.'); return; }
+  const todos=planos();
+  todos[nombre]={plantas:plantas.map(p=>({nombre:p.nombre, objetos:p.objetos})), metrosPorCuadro, fecha:Date.now(), miniatura:generarMiniatura()};
+  setPlanos(todos); nombreActual=nombre; actualizarNombre(); cerrar('modalGuardar');
+}
+function generarMiniatura(){
+  if(!objetos.length) return '';
+  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
+  objetos.forEach(o=>{ const c=cajaMundo(o); if(c){x1=Math.min(x1,c.x);y1=Math.min(y1,c.y);x2=Math.max(x2,c.x+c.w);y2=Math.max(y2,c.y+c.h);} });
+  const w=300,h=200; const tmp=document.createElement('canvas'); tmp.width=w; tmp.height=h;
+  const g=tmp.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,w,h);
+  const bw=x2-x1||1, bh=y2-y1||1; const esc=Math.min((w-20)/bw,(h-20)/bh);
+  const ox=(w-bw*esc)/2-x1*esc, oy=(h-bh*esc)/2-y1*esc;
+  const vG=vista, vsave={...vista}; vista={x:ox,y:oy,escala:esc};
+  const cs=ctx; // dibujar en tmp reutilizando funciones requiere ctx global -> usamos truco simple
+  // dibujo simplificado directamente
+  objetos.forEach(o=>{
+    if(o.tipo==='pared'){ g.strokeStyle='#1e293b'; g.lineWidth=Math.max(1,(o.grosor||12)*esc); g.beginPath(); g.moveTo(o.x1*esc+ox,o.y1*esc+oy); g.lineTo(o.x2*esc+ox,o.y2*esc+oy); g.stroke(); }
+    else if(o.tipo==='habitacion'){ g.strokeStyle='#1e293b'; g.lineWidth=Math.max(1,(o.grosor||12)*esc); g.strokeRect(Math.min(o.x1,o.x2)*esc+ox,Math.min(o.y1,o.y2)*esc+oy,Math.abs(o.x2-o.x1)*esc,Math.abs(o.y2-o.y1)*esc); }
+  });
+  vista=vsave;
+  return tmp.toDataURL('image/jpeg',0.6);
+}
+function abrirCargar(){
+  const todos=planos(); const grid=document.getElementById('gridPlanos'); grid.innerHTML='';
+  const nombres=Object.keys(todos).sort((a,b)=>todos[b].fecha-todos[a].fecha);
+  document.getElementById('cargarVacio').style.display=nombres.length?'none':'block';
+  nombres.forEach(n=>{
+    const p=todos[n]; const f=new Date(p.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
+    const d=document.createElement('div'); d.className='tarjeta-plano';
+    d.innerHTML=`<img src="${p.miniatura||''}" alt="">
+      <div class="tp-info"><div class="tp-nombre">${escaparHtml(n)}</div><div class="tp-fecha">${f}</div>
+      <button class="tp-borrar" onclick="event.stopPropagation();borrarPlano('${escaparJs(n)}')">🗑️ Borrar</button></div>`;
+    d.querySelector('img').onerror=function(){ this.style.display='none'; };
+    d.onclick=()=>cargarPlano(n);
+    grid.appendChild(d);
+  });
+  abrir('modalCargar');
+}
+function cargarPlano(n){ const p=planos()[n]; if(p){
+  if(p.plantas && p.plantas.length){ plantas=p.plantas.map(pl=>({nombre:pl.nombre, objetos:pl.objetos||[]})); }
+  else { plantas=[{nombre:'Planta baja', objetos:p.objetos||[]}]; }   // compatibilidad con planos antiguos
+  plantaActual=0; objetos=plantas[0].objetos;
+  metrosPorCuadro=p.metrosPorCuadro||0.5; document.getElementById('selEscala').value=metrosPorCuadro;
+  nombreActual=n; actualizarNombre(); seleccion=[]; historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); ajustarVista(); } cerrar('modalCargar'); }
+function borrarPlano(n){ if(confirm('¿Borrar el plano "'+n+'"?')){ const t=planos(); delete t[n]; setPlanos(t); abrirCargar(); } }
+function nuevoPlano(){ if(objetos.length && !confirm('¿Empezar un plano nuevo? Guarda antes si quieres conservar el actual.')) return; plantas=[{nombre:'Planta baja', objetos:[]}]; plantaActual=0; objetos=plantas[0].objetos; seleccion=[]; nombreActual=''; actualizarNombre(); historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); centrarVista(); }
+function actualizarNombre(){ document.getElementById('nombreActual').textContent=nombreActual?('📄 '+nombreActual):''; }
+
+/* =======================================================================
+   EXPORTAR / IMPRIMIR
+   ======================================================================= */
+function exportarPNG(){
+  const data=renderExport(2);
+  const a=document.createElement('a'); a.download=(nombreActual||'plano')+'.png'; a.href=data; a.click();
+}
+function imprimir(){
+  const data=renderExport(2);
+  const w=window.open(''); w.document.write(`<html><head><title>${nombreActual||'Plano'}</title></head>
+    <body style="margin:0;text-align:center;font-family:Segoe UI"><h2>${escaparHtml(nombreActual||'Plano')}</h2>
+    <img src="${data}" style="max-width:100%"><script>window.onload=()=>{window.print();}<\/script></body></html>`);
+  w.document.close();
+}
+function renderExport(mult){
+  // calcular el recuadro que abarca todo el dibujo
+  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
+  if(objetos.length){ objetos.forEach(o=>{ const c=cajaMundo(o); if(c){x1=Math.min(x1,c.x);y1=Math.min(y1,c.y);x2=Math.max(x2,c.x+c.w);y2=Math.max(y2,c.y+c.h);} }); }
+  else { x1=0;y1=0;x2=GRID*10;y2=GRID*10; }
+  const m=GRID; x1-=m;y1-=m;x2+=m;y2+=m;
+  const w=(x2-x1), h=(y2-y1);
+  const tmp=document.createElement('canvas');
+  tmp.width=Math.max(1,Math.round(w*mult)); tmp.height=Math.max(1,Math.round(h*mult));
+  const g=tmp.getContext('2d');
+  // intercambiar el contexto y la vista temporalmente (las funciones de dibujo usan 'ctx' y 'vista')
+  const ctxReal=ctx, vReal={...vista};
+  ctx=g; vista={x:-x1*mult, y:-y1*mult, escala:mult};
+  g.fillStyle='#fff'; g.fillRect(0,0,tmp.width,tmp.height);
+  objetos.forEach(o=>{ if(CAPAS[o.capa].visible) dibujarObjeto(o,false); });
+  ctx=ctxReal; vista=vReal; // restaurar
+  return tmp.toDataURL('image/png');
+}
+
+/* =======================================================================
+   INSTALACIÓN PWA
+   ======================================================================= */
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); promptInstalar=e; document.getElementById('btnInstalar').style.display='inline-flex'; });
+function instalarApp(){ if(promptInstalar){ promptInstalar.prompt(); promptInstalar=null; document.getElementById('btnInstalar').style.display='none'; } }
+window.addEventListener('appinstalled',()=>{ document.getElementById('btnInstalar').style.display='none'; });
+if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+
+/* =======================================================================
+   ARRANQUE
+   ======================================================================= */
+construirHerramientas();
+construirCapas();
+elegir('seleccionar');
+ajustarTamano();
+centrarVista();
+// recuperar borrador
+try{ const b=JSON.parse(localStorage.getItem('planoBorrador')); if(b){
+  if(b.plantas && b.plantas.length){ plantas=b.plantas.map(p=>({nombre:p.nombre, objetos:p.objetos||[]})); plantaActual=Math.min(b.plantaActual||0, plantas.length-1); objetos=plantas[plantaActual].objetos; }
+  else if(b.objetos && b.objetos.length){ plantas=[{nombre:'Planta baja', objetos:b.objetos}]; plantaActual=0; objetos=plantas[0].objetos; }
+  metrosPorCuadro=b.metrosPorCuadro||0.5; document.getElementById('selEscala').value=metrosPorCuadro; ajustarVista();
+} }catch(e){}
+actualizarPlantas();
+aplicarLayout();
+
+function abrir(id){ document.getElementById(id).style.display='flex'; }
+function cerrar(id){ document.getElementById(id).style.display='none'; }
+function escaparHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function escaparJs(s){ return (''+s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Programas de Papá</title>
+<style>
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:"Segoe UI",system-ui,Arial,sans-serif;
+    min-height:100vh; background:linear-gradient(135deg,#2563eb,#1e3a8a);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:24px; color:#fff; text-align:center;
+  }
+  h1{font-size:38px; margin-bottom:8px;}
+  p.sub{font-size:20px; opacity:.9; margin-bottom:40px;}
+  .botones{display:flex; gap:24px; flex-wrap:wrap; justify-content:center;}
+  a.tarjeta{
+    background:#fff; color:#0f172a; text-decoration:none; border-radius:22px;
+    padding:40px 34px; width:280px; box-shadow:0 10px 30px rgba(0,0,0,.3);
+    transition:transform .15s; display:block;
+  }
+  a.tarjeta:hover{transform:translateY(-6px);}
+  a.tarjeta .icono{font-size:80px; display:block; margin-bottom:16px;}
+  a.tarjeta h2{font-size:28px; margin-bottom:10px;}
+  a.tarjeta p{font-size:17px; color:#475569;}
+  footer{margin-top:46px; font-size:15px; opacity:.8;}
+  @media(max-width:640px){ h1{font-size:30px;} a.tarjeta{width:100%; max-width:340px;} }
+</style>
+</head>
+<body>
+  <h1>👋 Hola</h1>
+  <p class="sub">Elige qué quieres hacer</p>
+  <div class="botones">
+    <a class="tarjeta" href="Agenda/Agenda.html">
+      <span class="icono">📅</span>
+      <h2>Mi Agenda</h2>
+      <p>Notas y recordatorios con alarma que avisa hasta que la paras.</p>
+    </a>
+    <a class="tarjeta" href="Planos/Planos.html">
+      <span class="icono">📐</span>
+      <h2>Dibujar Planos</h2>
+      <p>Dibuja casas, habitaciones y esquemas eléctricos fácilmente.</p>
+    </a>
+  </div>
+  <footer>Hecho con cariño 💙 — Doble clic en cualquiera para empezar</footer>
+</body>
+</html>

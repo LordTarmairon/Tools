@@ -1,0 +1,16 @@
+{
+  "name": "Mi Agenda",
+  "short_name": "Agenda",
+  "description": "Notas y recordatorios con alarma que avisa hasta que la paras.",
+  "start_url": "./Agenda.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#e8edf3",
+  "theme_color": "#2563eb",
+  "lang": "es",
+  "icons": [
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

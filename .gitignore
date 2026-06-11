@@ -1,0 +1,12 @@
+# Archivos temporales / del sistema
+_chk.js
+_check.js
+*.log
+Thumbs.db
+.DS_Store
+
+# Por seguridad: nunca subir secretos ni configuración con credenciales
+secret*
+*.secret
+.env
+config.local.*
