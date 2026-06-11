@@ -273,7 +273,7 @@
     </div>
     <div id="calMes">
       <div class="cal-grid" id="calGrid"></div>
-      <div class="cal-hint"><i class="bi bi-info-circle"></i> Doble clic en un día para crear un evento · arrastra para varios días</div>
+      <div class="cal-hint"><i class="bi bi-info-circle"></i> Doble clic en un día para crear · arrastra entre días para un evento de varios días · arrastra un evento a otro día para moverlo</div>
       <div id="calDet" style="margin-top:16px;"></div>
     </div>
     <div id="calTiempo" style="display:none;"></div>
@@ -570,7 +570,8 @@ function dibMes(){
         const bar=document.createElement('div'); bar.className='cal-barra'; bar.style.background=cat(n.categoria).color;
         bar.textContent=(!n.todoElDia&&n.horaInicio?n.horaInicio+' ':'')+(n.titulo||'(sin título)');
         bar.title=n.titulo||''; if(n.hecho) bar.style.opacity='.5';
-        bar.onpointerdown=e=>e.stopPropagation(); bar.onclick=e=>{ e.stopPropagation(); abrirForm(n.id); };
+        bar.dataset.id=n.id;
+        bar.onpointerdown=e=>{ e.stopPropagation(); dragMes={n,bar,sx:e.clientX,sy:e.clientY,moved:false}; try{bar.setPointerCapture(e.pointerId);}catch(_){} };
         cont.appendChild(bar);
       });
       if(delDia.length>MAX){ const mas=document.createElement('div'); mas.className='cal-mas'; mas.textContent='+'+(delDia.length-MAX)+' más';
@@ -590,6 +591,17 @@ document.addEventListener('pointerup',()=>{ if(!arrastrando) return; arrastrando
   if(arrastreMulti){ Object.values(calCeldas).forEach(c=>c.classList.remove('rango')); abrirForm(null,{fechaInicio:a,fechaFin:b,variosDias:true}); }
   else { Object.values(calCeldas).forEach(c=>c.classList.remove('rango')); mostrarDia(selIni); }
 });
+/* ---- arrastrar un evento de un día a otro (vista Mes) ---- */
+let dragMes=null;
+function celdaDe(x,y){ const el=document.elementFromPoint(x,y); return (el&&el.closest)?el.closest('.cal-celda[data-f]'):null; }
+document.addEventListener('pointermove',e=>{ if(!dragMes)return; if(!dragMes.moved && Math.hypot(e.clientX-dragMes.sx,e.clientY-dragMes.sy)<6)return; dragMes.moved=true; dragMes.bar.style.opacity='.4';
+  Object.values(calCeldas).forEach(c=>c.classList.remove('rango')); const cel=celdaDe(e.clientX,e.clientY); if(cel)cel.classList.add('rango'); dragMes._cel=cel; });
+document.addEventListener('pointerup',e=>{ if(!dragMes)return; const d=dragMes; dragMes=null; Object.values(calCeldas).forEach(c=>c.classList.remove('rango'));
+  if(!d.moved){ abrirForm(d.n.id); return; }
+  const cel=d._cel||celdaDe(e.clientX,e.clientY);
+  if(cel && cel.dataset.f && cel.dataset.f!==d.n.fechaInicio) moverEventoADia(d.n,cel.dataset.f); else dibCalendario();
+});
+function moverEventoADia(n,target){ const delta=Math.round((deYmd(target)-deYmd(n.fechaInicio))/86400000); n.fechaInicio=target; if(n.fechaFin){ const f=deYmd(n.fechaFin); f.setDate(f.getDate()+delta); n.fechaFin=ymd(f); } n.hecho=false; n.posponer=null; guardar(); dibCalendario(); }
 function mostrarDia(fStr){
   Object.values(calCeldas).forEach(c=>c.classList.remove('sel')); if(calCeldas[fStr]) calCeldas[fStr].classList.add('sel');
   const del=notas.filter(n=>cubreDia(n,fStr)).sort((a,b)=>(a.horaInicio||'').localeCompare(b.horaInicio||''));
