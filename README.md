@@ -1,4 +1,4 @@
-# Apps para Papá 🛠️📅
+# Apps
 
 Dos aplicaciones web sencillas, en español, hechas a medida:
 
