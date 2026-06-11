@@ -168,6 +168,9 @@
   .ct-ev.arrastrando{opacity:.9; cursor:grabbing; z-index:6; box-shadow:var(--sombra);}
   .ct-ev-t{font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.2;}
   .ct-ev-h{font-size:10.5px; opacity:.92;}
+  .ct-ev-rz{position:absolute; left:0; right:0; bottom:0; height:11px; cursor:ns-resize; touch-action:none;}
+  .ct-ev-rz::after{content:""; position:absolute; left:50%; bottom:3px; width:22px; height:3px; transform:translateX(-50%); background:rgba(255,255,255,.75); border-radius:2px;}
+  .ct-col{cursor:copy;}
 
   /* ---------- modales ---------- */
   .fondo{position:fixed; inset:0; background:rgba(15,23,42,.55); backdrop-filter:blur(3px); z-index:60; display:flex; align-items:flex-start; justify-content:center; padding:16px; overflow-y:auto;}
@@ -606,7 +609,8 @@ function dibTiempo(ndias){
     : capit(dias[0].toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}));
   const cols='52px repeat('+ndias+',1fr)';
   const dn=['lun','mar','mié','jue','vie','sáb','dom'];
-  let html='<div class="ct-head" style="grid-template-columns:'+cols+'"><div></div>';
+  let html='<div class="cal-hint" style="margin:0 0 8px"><i class="bi bi-hand-index"></i> Toca un hueco para crear · arrastra para mover · estira el borde de abajo para la duración</div>';
+  html+='<div class="ct-head" style="grid-template-columns:'+cols+'"><div></div>';
   dias.forEach(d=>{ const ds=ymd(d); html+=`<div class="ct-dia-cab ${ds===hoyYmd()?'hoy':''}" ondblclick="nuevoEnDia('${ds}')"><div class="ct-dn">${dn[(d.getDay()+6)%7]}</div><div class="ct-dnum">${d.getDate()}</div></div>`; });
   html+='</div>';
   html+='<div class="ct-allday" style="grid-template-columns:'+cols+'"><div class="ct-lbl">Todo<br>el día</div>';
@@ -632,7 +636,7 @@ function colocarBloques(col,evs){
   arr.forEach(o=>{ const n=o.n, top=o.s/60*HH, hgt=Math.max(22,(o.e-o.s)/60*HH), w=100/nL, left=o.lane*w;
     const b=document.createElement('div'); b.className='ct-ev'; b.dataset.id=n.id;
     b.style.cssText=`top:${top}px;height:${hgt}px;left:calc(${left}% + 2px);width:calc(${w}% - 4px);background:${cat(n.categoria).color}`;
-    b.innerHTML=`<div class="ct-ev-t">${esc(n.titulo||'(sin título)')}</div><div class="ct-ev-h">${n.horaInicio}${n.horaFin?'–'+n.horaFin:''}</div>`;
+    b.innerHTML=`<div class="ct-ev-t">${esc(n.titulo||'(sin título)')}</div><div class="ct-ev-h">${n.horaInicio}${n.horaFin?'–'+n.horaFin:''}</div><div class="ct-ev-rz"></div>`;
     col.appendChild(b);
   });
 }
@@ -640,24 +644,40 @@ function activarDragTiempo(cont,hh){
   const cols=[...cont.querySelectorAll('.ct-col')]; let drag=null;
   cont.querySelectorAll('.ct-ev').forEach(b=>{
     b.addEventListener('pointerdown',e=>{ e.preventDefault(); const n=notas.find(x=>x.id===b.dataset.id); if(!n)return;
-      const dur=(n.horaFin?minutos(n.horaFin):minutos(n.horaInicio)+60)-minutos(n.horaInicio);
-      drag={b,n,dur:dur>0?dur:60,sx:e.clientX,sy:e.clientY,moved:false}; try{b.setPointerCapture(e.pointerId);}catch(_){} });
+      const s=minutos(n.horaInicio), eMin=n.horaFin?minutos(n.horaFin):s+60;
+      const modo = e.target.classList.contains('ct-ev-rz') ? 'resize' : 'mover';
+      drag={b,n,modo,s,dur:Math.max(15,(eMin>s?eMin:s+60)-s),sx:e.clientX,sy:e.clientY,moved:false};
+      try{b.setPointerCapture(e.pointerId);}catch(_){} });
   });
   cont.addEventListener('pointermove',e=>{ if(!drag)return; if(!drag.moved && Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)<6)return; drag.moved=true; drag.b.classList.add('arrastrando');
-    let col=null; cols.forEach(c=>{ const r=c.getBoundingClientRect(); if(e.clientX>=r.left&&e.clientX<r.right)col=c; }); col=col||drag._col||cols[0];
-    const r=col.getBoundingClientRect(); let mm=Math.round(((e.clientY-r.top)/hh*60)/15)*15; mm=Math.max(0,Math.min(24*60-drag.dur,mm));
-    drag._col=col; drag._min=mm; if(drag.b.parentNode!==col)col.appendChild(drag.b);
-    drag.b.style.top=(mm/60*hh)+'px'; drag.b.style.left='2px'; drag.b.style.width='calc(100% - 4px)';
+    if(drag.modo==='resize'){
+      const col=drag.b.parentNode, r=col.getBoundingClientRect();
+      let endMin=Math.round(((e.clientY-r.top)/hh*60)/15)*15; endMin=Math.max(drag.s+15,Math.min(1440,endMin));
+      drag._end=endMin; drag.b.style.height=((endMin-drag.s)/60*hh)+'px';
+      const h=drag.b.querySelector('.ct-ev-h'); if(h) h.textContent=p2(Math.floor(drag.s/60))+':'+p2(drag.s%60)+'–'+p2(Math.floor(endMin/60)%24)+':'+p2(endMin%60);
+    } else {
+      let col=null; cols.forEach(c=>{ const r=c.getBoundingClientRect(); if(e.clientX>=r.left&&e.clientX<r.right)col=c; }); col=col||drag._col||drag.b.parentNode;
+      const r=col.getBoundingClientRect(); let mm=Math.round(((e.clientY-r.top)/hh*60)/15)*15; mm=Math.max(0,Math.min(24*60-drag.dur,mm));
+      drag._col=col; drag._min=mm; if(drag.b.parentNode!==col)col.appendChild(drag.b);
+      drag.b.style.top=(mm/60*hh)+'px'; drag.b.style.left='2px'; drag.b.style.width='calc(100% - 4px)';
+    }
   });
   function fin(){ if(!drag)return; const d=drag; drag=null;
     if(!d.moved){ d.b.classList.remove('arrastrando'); abrirForm(d.n.id); return; }
-    const ef=Math.min(d._min+d.dur,1439);
-    d.n.fechaInicio=d._col.dataset.f; if(d.n.fechaFin)d.n.fechaFin=d.n.fechaInicio;
-    d.n.horaInicio=p2(Math.floor(d._min/60))+':'+p2(d._min%60);
-    d.n.horaFin=p2(Math.floor(ef/60))+':'+p2(ef%60);
+    if(d.modo==='resize'){ const ef=Math.min(d._end,1439); d.n.horaFin=p2(Math.floor(ef/60))+':'+p2(ef%60); }
+    else { const ef=Math.min(d._min+d.dur,1439); d.n.fechaInicio=d._col.dataset.f; if(d.n.fechaFin)d.n.fechaFin=d.n.fechaInicio; d.n.horaInicio=p2(Math.floor(d._min/60))+':'+p2(d._min%60); d.n.horaFin=p2(Math.floor(ef/60))+':'+p2(ef%60); }
     d.n.hecho=false; d.n.posponer=null; guardar(); dibCalendario();
   }
   cont.addEventListener('pointerup',fin); cont.addEventListener('pointercancel',fin);
+  // tocar un hueco vacío crea un evento a esa hora
+  cols.forEach(col=>{ let dy=null,mv=false;
+    col.addEventListener('pointerdown',e=>{ if(e.target!==col){dy=null;return;} dy=e.clientY; mv=false; });
+    col.addEventListener('pointermove',e=>{ if(dy!=null && Math.abs(e.clientY-dy)>8) mv=true; });
+    col.addEventListener('pointerup',e=>{ if(e.target!==col||dy==null||mv){ dy=null; return; }
+      const r=col.getBoundingClientRect(); let mm=Math.round(((e.clientY-r.top)/hh*60)/30)*30; mm=Math.max(0,Math.min(23*60+30,mm));
+      abrirForm(null,{fechaInicio:col.dataset.f,horaInicio:p2(Math.floor(mm/60))+':'+p2(mm%60)}); dy=null;
+    });
+  });
 }
 
 /* ---- exportar evento al calendario del móvil (.ics) ---- */
@@ -692,6 +712,7 @@ function abrirForm(id, pre){
   cTodoDia.checked = n? (n.todoElDia!==false&&!n.horaInicio? true : !!n.todoElDia) : true;
   if(n) cTodoDia.checked = !!n.todoElDia;
   cHoraIni.value = n?n.horaInicio||'':''; cHoraFin.value = n?n.horaFin||'':'';
+  if(!n && pre.horaInicio){ cTieneFecha.checked=true; cTodoDia.checked=false; cHoraIni.value=pre.horaInicio; const mm=minutos(pre.horaInicio)+60; cHoraFin.value=p2(Math.floor(mm/60)%24)+':'+p2(mm%60); }
   cAlarma.checked = n?!!n.alarma:false;
   cAvisar.value = n?(n.avisar||0):0; cRepetir.value = n?n.repetir||'no':'no'; cTono.value = n?n.tono||'campana':'campana';
   if(n&&n.tono==='custom'&&n.sonidoId){ const s=sonidos()[n.sonidoId]; if(s){ formSonido={id:n.sonidoId,nombre:s.nombre,datos:s.datos}; } }
