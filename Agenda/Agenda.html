@@ -492,20 +492,31 @@ function pasaFiltro(n){
 function render(){ if(vista==='calendario'){ dibCalendario(); return; } const l=notas.filter(pasaFiltro); if(vista==='hoy') renderHoy(l); else renderLista(l); }
 
 function renderHoy(l){
-  const cont=document.getElementById('zona'); const ahora=new Date(), hoy=hoyYmd();
-  const conF=l.filter(n=>n.fechaInicio && !n.hecho);
-  const venc=conF.filter(esVencida);
-  const deHoy=conF.filter(n=>!esVencida(n) && cubreDia(n,hoy));
+  const cont=document.getElementById('zona'); const hoy=hoyYmd();
   const lim=new Date(); lim.setDate(lim.getDate()+8); const limY=ymd(lim);
-  const prox=conF.filter(n=>!esVencida(n) && !cubreDia(n,hoy) && n.fechaInicio>hoy && n.fechaInicio<limY).sort((a,b)=>(a.fechaInicio+a.horaInicio).localeCompare(b.fechaInicio+b.horaInicio));
+  const conF=l.filter(n=>n.fechaInicio && !n.hecho);
+  const venc=[], deHoy=[], prox=[]; // prox: {n, fecha}
+  const esRep=n=>n.repetir && n.repetir!=='no';
+  conF.forEach(n=>{
+    if(esRep(n)){
+      if(ocurreEnDia(n,hoy)) deHoy.push(n);
+      else { const p=proximaOcurrencia(n,hoy,limY); if(p) prox.push({n,fecha:p}); }
+    } else {
+      if(esVencida(n)) venc.push(n);
+      else if(cubreDia(n,hoy)) deHoy.push(n);
+      else if(n.fechaInicio>hoy && n.fechaInicio<limY) prox.push({n,fecha:n.fechaInicio});
+    }
+  });
+  prox.sort((a,b)=>(a.fecha+(a.n.horaInicio||'')).localeCompare(b.fecha+(b.n.horaInicio||'')));
   const sinF=l.filter(n=>!n.fechaInicio && !n.hecho);
+  const occHoy=n=>esRep(n)?hoy:undefined;
   let h=`<div class="resumen"><i class="bi bi-clipboard-check"></i> Tienes <b>${venc.length}</b> sin atender, <b>${deHoy.length}</b> para hoy y <b>${prox.length}</b> esta semana.</div>`;
   if(!venc.length&&!deHoy.length&&!prox.length&&!sinF.length){ cont.innerHTML=h+'<div class="vacio"><i class="bi bi-emoji-sunglasses"></i>¡Todo al día!<br>No tienes nada pendiente.</div>'; return; }
-  if(venc.length) h+=`<div class="sec-cab alerta"><i class="bi bi-exclamation-triangle-fill"></i> Sin atender</div><div class="lista">${venc.map(tarjeta).join('')}</div>`;
-  if(deHoy.length) h+=`<div class="sec-cab"><i class="bi bi-star-fill"></i> Hoy</div><div class="lista">${deHoy.map(tarjeta).join('')}</div>`;
+  if(venc.length) h+=`<div class="sec-cab alerta"><i class="bi bi-exclamation-triangle-fill"></i> Sin atender</div><div class="lista">${venc.map(n=>tarjeta(n)).join('')}</div>`;
+  if(deHoy.length) h+=`<div class="sec-cab"><i class="bi bi-star-fill"></i> Hoy</div><div class="lista">${deHoy.map(n=>tarjeta(n,occHoy(n))).join('')}</div>`;
   if(prox.length){ h+=`<div class="sec-cab"><i class="bi bi-calendar-week"></i> Próximos días</div>`; let act='';
-    prox.forEach(n=>{ const dia=deYmd(n.fechaInicio).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}); if(dia!==act){ if(act)h+='</div>'; h+=`<div class="sec-cab" style="font-size:13px;color:var(--suave)">${dia.charAt(0).toUpperCase()+dia.slice(1)}</div><div class="lista">`; act=dia; } h+=tarjeta(n); }); if(act)h+='</div>'; }
-  if(sinF.length) h+=`<div class="sec-cab"><i class="bi bi-sticky"></i> Notas sin fecha</div><div class="lista">${sinF.map(tarjeta).join('')}</div>`;
+    prox.forEach(o=>{ const dia=deYmd(o.fecha).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}); if(dia!==act){ if(act)h+='</div>'; h+=`<div class="sec-cab" style="font-size:13px;color:var(--suave)">${dia.charAt(0).toUpperCase()+dia.slice(1)}</div><div class="lista">`; act=dia; } h+=tarjeta(o.n, esRep(o.n)?o.fecha:undefined); }); if(act)h+='</div>'; }
+  if(sinF.length) h+=`<div class="sec-cab"><i class="bi bi-sticky"></i> Notas sin fecha</div><div class="lista">${sinF.map(n=>tarjeta(n)).join('')}</div>`;
   cont.innerHTML=h;
 }
 function renderLista(l){
@@ -515,29 +526,32 @@ function renderLista(l){
   cont.innerHTML=`<div class="lista">${o.map(tarjeta).join('')}</div>`;
 }
 
-function textoCuando(n){
+function textoCuando(n, occ){
   if(!n.fechaInicio) return '';
-  const fi=deYmd(n.fechaInicio); let s='';
-  if(n.fechaFin && n.fechaFin!==n.fechaInicio){
-    const ff=deYmd(n.fechaFin);
+  let s='';
+  if(occ){ s = deYmd(occ).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}); }
+  else if(n.fechaFin && n.fechaFin!==n.fechaInicio){
+    const fi=deYmd(n.fechaInicio), ff=deYmd(n.fechaFin);
     s = fi.toLocaleDateString('es-ES',{day:'numeric',month:'short'})+' – '+ff.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
   } else {
-    s = fi.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
+    s = deYmd(n.fechaInicio).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
   }
   if(!n.todoElDia && n.horaInicio){ s+=' · '+n.horaInicio+(n.horaFin?'–'+n.horaFin:''); }
   else if(n.todoElDia){ s+=' · todo el día'; }
   return s;
 }
-function tarjeta(n){
+function proximaOcurrencia(n, fromY, limY){ const d=deYmd(fromY); for(let i=0;i<370;i++){ d.setDate(d.getDate()+1); const s=ymd(d); if(s>=limY) return null; if(ocurreEnDia(n,s)) return s; } return null; }
+function tarjeta(n, occRaw){
+  const occ = (typeof occRaw==='string')?occRaw:null;
   const c=cat(n.categoria);
-  let cls='nota'; if(n.hecho)cls+=' hecha'; else if(esVencida(n))cls+=' vencida';
+  let cls='nota'; if(n.hecho)cls+=' hecha'; else if(!occ && esVencida(n))cls+=' vencida';
   let h=`<div class="${cls}" style="border-left-color:${c.color}">`;
   h+=`<div class="cab"><h3>${n.titulo?esc(n.titulo):'(sin título)'}</h3>`;
   if(n.importante) h+=`<i class="bi bi-star-fill estrella"></i>`;
   h+=`<span class="cat-tag" style="background:${c.color}">${esc(c.nombre)}</span></div>`;
   if(n.texto) h+=`<div class="texto">${esc(n.texto)}</div>`;
   if(n.items&&n.items.length){ h+=`<div class="check-lista">`; n.items.forEach((it,i)=>{ h+=`<div class="check-item ${it.hecho?'ok':''}" onclick="toggleItem('${n.id}',${i})"><span class="caja">${it.hecho?"<i class='bi bi-check-lg'></i>":""}</span><span>${esc(it.txt)}</span></div>`; }); h+=`</div>`; }
-  if(n.fechaInicio){ const v=esVencida(n); h+=`<div class="cuando ${v?'vencida':''}"><i class="bi bi-${n.alarma?'alarm':'calendar-event'}"></i> ${textoCuando(n)}${n.alarma&&n.repetir!=='no'?' · '+etqRep(n.repetir):''}</div>`; }
+  if(n.fechaInicio){ const v=!occ&&esVencida(n); h+=`<div class="cuando ${v?'vencida':''}"><i class="bi bi-${n.alarma?'alarm':'calendar-event'}"></i> ${textoCuando(n,occ)}${n.repetir&&n.repetir!=='no'?' · '+etqRep(n.repetir):''}</div>`; }
   h+=`<div class="acciones">`;
   if(!n.hecho) h+=`<button class="btn btn-verde" onclick="marcarHecho('${n.id}')"><i class="bi bi-check-lg"></i> Hecho</button>`;
   else h+=`<button class="btn btn-ghost" onclick="reactivar('${n.id}')"><i class="bi bi-arrow-counterclockwise"></i> Reactivar</button>`;
