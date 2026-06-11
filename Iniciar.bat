@@ -27,13 +27,13 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do set "IP=%
 set "IP=%IP: =%"
 if defined IP (
   echo   PARA EL MOVIL ^(misma WiFi^): abre en el navegador del movil:
-  echo        http://%IP%:8765/Inicio.html
+  echo        http://%IP%:8765/index.html
   echo   ^(La primera vez Windows puede pedir permiso de red: pulsa "Permitir acceso".^)
   echo.
 )
 
 rem --- Abrir el navegador un par de segundos despues (en otra ventanita que se cierra sola) ---
-start "abrir navegador" /min cmd /c "ping 127.0.0.1 -n 3 >nul & start http://localhost:8765/Inicio.html"
+start "abrir navegador" /min cmd /c "ping 127.0.0.1 -n 3 >nul & start http://localhost:8765/index.html"
 
 rem --- Arrancar el servidor (se queda funcionando aqui) ---
 %PY% -m http.server 8765
