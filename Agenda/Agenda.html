@@ -2,8 +2,12 @@
 <html lang="es" data-tema="claro">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#4f46e5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Mi Agenda">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icono-192.png">
 <link rel="stylesheet" href="../lib/bootstrap-icons/bootstrap-icons.min.css">
@@ -34,7 +38,8 @@
 
   /* ---------- cabecera glass ---------- */
   header{
-    position:sticky; top:0; z-index:30; padding:12px 18px;
+    position:sticky; top:0; z-index:30;
+    padding:calc(12px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) 12px calc(18px + env(safe-area-inset-left));
     background:var(--glass); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
     border-bottom:1px solid var(--borde); box-shadow:var(--sombra-sm);
   }
@@ -123,15 +128,19 @@
   .cal-cab div{font-size:20px; font-weight:800; text-transform:capitalize;}
   .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px;}
   .cal-dn{text-align:center; font-weight:700; color:var(--suave); padding:5px 0; font-size:13px;}
-  .cal-celda{aspect-ratio:1; border:1px solid var(--borde); border-radius:11px; padding:5px; display:flex; flex-direction:column;
-    align-items:center; cursor:pointer; font-size:15px; gap:3px; user-select:none; transition:.1s; background:var(--tarjeta);}
+  .cal-celda{min-height:66px; border:1px solid var(--borde); border-radius:11px; padding:4px; display:flex; flex-direction:column;
+    align-items:stretch; cursor:pointer; font-size:14px; gap:2px; user-select:none; transition:.1s; background:var(--tarjeta); overflow:hidden;}
+  .cal-celda>.dia-num{align-self:flex-start; font-weight:700; padding:0 3px;}
   .cal-celda.vacia{border:none; cursor:default; background:transparent;}
   .cal-celda:not(.vacia):hover{border-color:var(--acento);}
-  .cal-celda.hoy{background:color-mix(in srgb, var(--acento) 14%, transparent); border-color:var(--acento); font-weight:800;}
+  .cal-celda.hoy{background:color-mix(in srgb, var(--acento) 14%, transparent); border-color:var(--acento);}
+  .cal-celda.hoy>.dia-num{background:var(--acento); color:#fff; border-radius:50%; width:24px; height:24px; line-height:24px; text-align:center; padding:0;}
   .cal-celda.rango{background:color-mix(in srgb, var(--acento) 26%, transparent); border-color:var(--acento);}
   .cal-celda.sel{outline:3px solid var(--acento); outline-offset:-1px;}
-  .cal-pts{display:flex; gap:3px; margin-top:auto; flex-wrap:wrap; justify-content:center;}
-  .cal-pts span{width:7px; height:7px; border-radius:50%;}
+  .cal-barras{display:flex; flex-direction:column; gap:2px; margin-top:1px; overflow:hidden;}
+  .cal-barra{font-size:10.5px; color:#fff; border-radius:4px; padding:1px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; line-height:1.4;}
+  .cal-mas{font-size:10px; color:var(--suave); padding:0 4px; font-weight:700;}
+  @media(max-width:560px){ .cal-celda{min-height:54px;} .cal-barra{font-size:9px; padding:1px 3px;} }
   .cal-hint{font-size:12.5px; color:var(--suave); margin-top:10px; text-align:center;}
   /* selector de vista y navegación */
   .cal-top{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
@@ -546,9 +555,22 @@ function dibMes(){
   for(let i=0;i<ini;i++){const e=document.createElement('div');e.className='cal-celda vacia';grid.appendChild(e);}
   for(let d=1;d<=dias;d++){
     const fStr=anio+'-'+p2(mes+1)+'-'+p2(d);
-    const cel=document.createElement('div'); cel.className='cal-celda'+(fStr===hoy?' hoy':''); cel.dataset.f=fStr; cel.innerHTML=`<span>${d}</span>`;
-    const delDia=notas.filter(n=>cubreDia(n,fStr));
-    if(delDia.length){ const pts=document.createElement('div'); pts.className='cal-pts'; [...new Set(delDia.map(n=>n.categoria||'general'))].slice(0,4).forEach(id=>{const s=document.createElement('span');s.style.background=cat(id).color;pts.appendChild(s);}); cel.appendChild(pts); }
+    const cel=document.createElement('div'); cel.className='cal-celda'+(fStr===hoy?' hoy':''); cel.dataset.f=fStr; cel.innerHTML=`<span class="dia-num">${d}</span>`;
+    const delDia=notas.filter(n=>cubreDia(n,fStr)).sort((a,b)=>((a.todoElDia?'':a.horaInicio||'~')+'').localeCompare((b.todoElDia?'':b.horaInicio||'~')+''));
+    if(delDia.length){
+      const cont=document.createElement('div'); cont.className='cal-barras';
+      const MAX = esMovil()?2:3;
+      delDia.slice(0,MAX).forEach(n=>{
+        const bar=document.createElement('div'); bar.className='cal-barra'; bar.style.background=cat(n.categoria).color;
+        bar.textContent=(!n.todoElDia&&n.horaInicio?n.horaInicio+' ':'')+(n.titulo||'(sin título)');
+        bar.title=n.titulo||''; if(n.hecho) bar.style.opacity='.5';
+        bar.onpointerdown=e=>e.stopPropagation(); bar.onclick=e=>{ e.stopPropagation(); abrirForm(n.id); };
+        cont.appendChild(bar);
+      });
+      if(delDia.length>MAX){ const mas=document.createElement('div'); mas.className='cal-mas'; mas.textContent='+'+(delDia.length-MAX)+' más';
+        mas.onpointerdown=e=>e.stopPropagation(); mas.onclick=e=>{ e.stopPropagation(); mostrarDia(fStr); }; cont.appendChild(mas); }
+      cel.appendChild(cont);
+    }
     cel.onpointerdown=e=>{ arrastrando=true; arrastreMulti=false; selIni=selFin=fStr; pintarRango(); };
     cel.onpointerenter=e=>{ if(arrastrando){ selFin=fStr; if(selFin!==selIni) arrastreMulti=true; pintarRango(); } };
     cel.ondblclick=e=>{ nuevoEnDia(fStr); };
