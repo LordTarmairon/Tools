@@ -172,7 +172,7 @@
     /* cabecera mínima: logo + (elemento seleccionado) + hamburguesa. Siempre por encima del menú */
     header{flex-wrap:nowrap; gap:8px; padding:8px 12px; z-index:46;}
     header .logo span{display:none;}
-    .ham{display:inline-flex; width:44px; height:44px; font-size:22px;}
+    .ham{display:inline-flex; margin-left:auto; width:44px; height:44px; font-size:22px; flex-shrink:0;}
     .sel-chip.visible{display:flex; align-items:center; gap:8px; flex:1; min-width:0; cursor:pointer;
       background:rgba(255,255,255,.18); color:#fff; padding:7px 12px; border-radius:999px; font-size:13.5px; font-weight:600;}
     .sel-chip.visible span{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -216,7 +216,7 @@
 
 <header>
   <div class="logo"><i class="bi bi-rulers"></i> <span>Planos</span></div>
-  <div class="sel-chip" id="selChip" onclick="deseleccionar()"></div>
+  <div class="sel-chip" id="selChip" onclick="elegir('seleccionar')"></div>
   <button class="ham" id="btnHam" onclick="toggleMenu()" title="Menú"><i class="bi bi-list"></i></button>
   <div id="headerAcciones" class="h-acc">
   <button class="btn-verde" onclick="nuevoPlano()"><i class="bi bi-file-earmark-plus"></i> Nuevo</button>
@@ -1162,6 +1162,7 @@ function alMover(e){
   if(accion.tipo==='banda'){ accion.x1=m.x; accion.y1=m.y; redibujar(); return; }
   if(accion.tipo==='mover'){
     const ddx=m.x-accion.px, ddy=m.y-accion.py;
+    if(Math.abs(ddx)>3||Math.abs(ddy)>3) accion.movido=true;
     seleccion.forEach((o,i)=>{
       const c=accion.copias[i];
       if(o.x1!==undefined){ o.x1=snap(c.x1+ddx); o.y1=snap(c.y1+ddy); o.x2=snap(c.x2+ddx); o.y2=snap(c.y2+ddy); }
@@ -1183,6 +1184,7 @@ function alMover(e){
 }
 
 function alSoltar(e){
+  const acc=accion;
   if(dibujando){
     const largo=Math.hypot(dibujando.x2-dibujando.x1,dibujando.y2-dibujando.y1);
     if(largo>GRID/3){ guardarHistorial(); objetos.push(dibujando); seleccion=[dibujando]; mostrarPropiedades(); }
@@ -1198,6 +1200,21 @@ function alSoltar(e){
   }
   accion=null; redibujar();
   lienzo.style.cursor = espacio?'grab':(herramienta==='mano'?'grab':(herramienta==='seleccionar'?'default':'crosshair'));
+  // móvil: un toque simple sobre un objeto (sin arrastrar) abre sus propiedades
+  if(acc && acc.tipo==='mover' && !acc.movido && esMovil() && seleccion.length){ abrirProps(); }
+}
+function abrirProps(){
+  setTopbar(); mostrarPropiedades();
+  document.getElementById('menuApp').classList.remove('abierto');
+  document.getElementById('herramientas').classList.remove('abierto');
+  document.getElementById('propiedades').classList.add('abierto');
+  document.getElementById('drawerBack').classList.add('activo');
+  iconoHam(false);
+}
+function cerrarProps(){
+  document.getElementById('propiedades').classList.remove('abierto');
+  if(!document.getElementById('menuApp').classList.contains('abierto') && !document.getElementById('herramientas').classList.contains('abierto'))
+    document.getElementById('drawerBack').classList.remove('activo');
 }
 
 function dibujarBanda(){
@@ -1233,7 +1250,8 @@ window.addEventListener('mousemove',alMover);
 window.addEventListener('mouseup',alSoltar);
 lienzo.addEventListener('touchstart',alPulsar,{passive:false});
 lienzo.addEventListener('touchmove',alMover,{passive:false});
-lienzo.addEventListener('touchend',alSoltar);
+window.addEventListener('touchend',alSoltar);
+window.addEventListener('touchcancel',alSoltar);
 lienzo.addEventListener('wheel',e=>{ e.preventDefault(); zoomEnPunto(e.deltaY<0?1.12:0.89,e.offsetX,e.offsetY); },{passive:false});
 lienzo.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('keydown',e=>{ if(e.code==='Space' && !document.querySelector('.fondo-oscuro[style*="flex"]')){ espacio=true; if(herramienta==='seleccionar') lienzo.style.cursor='grab'; } });
@@ -1266,7 +1284,19 @@ function elegir(h){
   lienzo.style.cursor = h==='mano'?'grab':(h==='seleccionar'?'default':'crosshair');
   if(h!=='seleccionar'){ seleccion=[]; mostrarPropiedades(); }
   if(esMovil()) cerrarDrawers();
+  actualizarChip();
   redibujar();
+}
+const ICO_HERR={mano:['✋','Mover vista'],pared:['🧱','Pared'],habitacion:['⬛','Habitación'],puerta:['🚪','Puerta'],ventana:['🪟','Ventana'],cota:['📏','Medida'],cable:['➰','Cable'],cablered:['🌐','Cable de red'],texto:['🔤','Texto']};
+function actualizarChip(){
+  const chip=document.getElementById('selChip'); if(!chip) return;
+  if(herramienta && herramienta!=='seleccionar'){
+    let ico,nom;
+    if(herramienta==='simbolo' && simboloActivo){ ico=ICONOS_SIMB[simboloActivo]||'▫️'; nom=SIMBOLOS[simboloActivo].nombre; }
+    else { const m=ICO_HERR[herramienta]||['✏️',herramienta]; ico=m[0]; nom=m[1]; }
+    chip.innerHTML='<span>'+ico+' '+esc(nom)+'</span><i class="bi bi-x-circle-fill"></i>';
+    chip.classList.add('visible');
+  } else { chip.classList.remove('visible'); chip.innerHTML=''; }
 }
 function elegirSimbolo(k){
   herramienta='simbolo'; simboloActivo=k; terminarCable();
@@ -1274,6 +1304,7 @@ function elegirSimbolo(k){
   const ay=document.getElementById('ayuda'); ay.textContent='Colocar: '+SIMBOLOS[k].nombre+'. '+AYUDAS.simbolo; ay.style.display='';
   lienzo.style.cursor='crosshair'; seleccion=[]; mostrarPropiedades();
   if(esMovil()) cerrarDrawers();
+  actualizarChip();
 }
 
 /* ---- cajones (menús ocultables) en móvil ---- */
@@ -1284,6 +1315,7 @@ function toggleDrawer(cual){
   const otro=document.getElementById(cual==='herramientas'?'propiedades':'herramientas');
   if(otro) otro.classList.remove('abierto');
   document.getElementById('menuApp').classList.remove('abierto');
+  if(cual==='propiedades' && !el.classList.contains('abierto')) mostrarPropiedades(); // regenerar antes de abrir
   const ab=el.classList.toggle('abierto');
   document.getElementById('drawerBack').classList.toggle('activo', ab);
 }
@@ -1334,8 +1366,7 @@ document.getElementById('ayuda').addEventListener('click', function(){ this.styl
 function mostrarPropiedades(){
   const cont=document.getElementById('panelPropiedades');
   const fp=document.getElementById('fabProps'); if(fp) fp.classList.toggle('hay', seleccion.length>0);
-  const chip=document.getElementById('selChip');
-  if(chip){ if(seleccion.length){ chip.innerHTML='<span>'+esc(seleccion.length===1?nombreDe(seleccion[0]):seleccion.length+' elementos')+'</span><i class="bi bi-x-circle-fill"></i>'; chip.classList.add('visible'); } else { chip.classList.remove('visible'); chip.innerHTML=''; } }
+  if(esMovil() && seleccion.length===0) cerrarProps();
   if(simulando) simRes=calcularSim();
   if(simRed) redRes=calcularRed();
   if(seleccion.length===0){ cont.innerHTML='<div class="prop-vacio">Selecciona algo del plano para ver y cambiar sus datos.</div>'; return; }
