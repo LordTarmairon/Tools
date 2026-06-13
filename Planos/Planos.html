@@ -225,6 +225,9 @@
     <button class="btn-verde" onclick="nuevoPlano()"><i class="bi bi-file-earmark-plus"></i> Nuevo</button>
     <button onclick="abrirGuardar()"><i class="bi bi-floppy"></i> Guardar</button>
     <button onclick="abrirCargar()"><i class="bi bi-folder2-open"></i> Abrir</button>
+  <button onclick="descargarPlano()" title="Descargar este plano a un archivo (para llevarlo a otro aparato)"><i class="bi bi-box-arrow-down"></i> Descargar</button>
+  <button onclick="document.getElementById('inpImportPlano').click()" title="Importar un plano desde un archivo"><i class="bi bi-box-arrow-up"></i> Importar</button>
+  <input type="file" id="inpImportPlano" accept=".json,application/json" style="display:none" onchange="importarPlano(this)">
     <div class="sep"></div>
     <button id="btnDeshacer" onclick="deshacer()" title="Deshacer el último cambio (Ctrl+Z)"><i class="bi bi-arrow-counterclockwise"></i></button>
     <button id="btnRehacer" onclick="rehacerAccion()" title="Rehacer (Ctrl+Y)"><i class="bi bi-arrow-clockwise"></i></button>
@@ -1981,6 +1984,19 @@
     metrosPorCuadro=p.metrosPorCuadro||0.5; document.getElementById('selEscala').value=metrosPorCuadro;
     nombreActual=n; actualizarNombre(); seleccion=[]; historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); ajustarVista(); } cerrar('modalCargar'); }
   function borrarPlano(n){ if(confirm('¿Borrar el plano "'+n+'"?')){ const t=planos(); delete t[n]; setPlanos(t); abrirCargar(); } }
+  function descargarPlano(){
+    const datos={tipo:'plano-padre', version:1, nombre:nombreActual||'plano', metrosPorCuadro, plantas:plantas.map(p=>({nombre:p.nombre,objetos:p.objetos,fondo:p.fondo}))};
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(datos)],{type:'application/json'}));
+    a.download=(nombreActual||'plano').replace(/[^\w\- ]/g,'')+'.plano.json'; a.click();
+  }
+  function importarPlano(input){ const f=input.files[0]; if(!f) return; const r=new FileReader();
+    r.onload=()=>{ try{ const d=JSON.parse(r.result); const pl=(d.plantas&&d.plantas.length)?d.plantas:(d.objetos?[{nombre:'Planta',objetos:d.objetos}]:null); if(!pl) throw 0;
+      plantas=pl.map(p=>({nombre:p.nombre||'Planta', objetos:p.objetos||[], fondo:p.fondo||null})); plantaActual=0; objetos=plantas[0].objetos;
+      metrosPorCuadro=d.metrosPorCuadro||0.5; document.getElementById('selEscala').value=metrosPorCuadro;
+      nombreActual=(d.nombre||'')+''; actualizarNombre(); seleccion=[]; historial.length=0; rehacer.length=0; _imgFondo=null; actualizarPlantas(); mostrarPropiedades(); ajustarVista();
+      alert('Plano importado ✓. Pulsa 💾 Guardar si quieres conservarlo en este aparato.');
+    }catch(e){ alert('El archivo no es un plano válido.'); } };
+    r.readAsText(f); input.value=''; }
   function nuevoPlano(){ if(objetos.length && !confirm('¿Empezar un plano nuevo? Guarda antes si quieres conservar el actual.')) return; plantas=[{nombre:'Planta baja', objetos:[]}]; plantaActual=0; objetos=plantas[0].objetos; seleccion=[]; nombreActual=''; actualizarNombre(); historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); centrarVista(); }
   function actualizarNombre(){ document.getElementById('nombreActual').textContent=nombreActual?('📄 '+nombreActual):''; }
 
