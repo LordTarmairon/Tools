@@ -44,6 +44,8 @@
     .btn-amarillo{background:linear-gradient(180deg,#fbbf24,#f59e0b); color:#422006;} .btn-amarillo:hover{filter:brightness(1.04);}
     .toggle{background:rgba(255,255,255,.15);}
     .toggle.on{background:#fff; color:var(--azul-osc); box-shadow:0 1px 3px rgba(0,0,0,.25);}
+    .sel-medida{color:#fff; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px; white-space:nowrap;}
+    .sel-medida select{font-family:inherit; font-size:13px; padding:5px 7px; border-radius:7px; border:none; background:rgba(255,255,255,.9); color:#0f172a;}
 
     .cuerpo{flex:1; display:flex; min-height:0;}
 
@@ -230,10 +232,12 @@
     <button onclick="exportarPNG()" title="Guardar el plano como imagen"><i class="bi bi-image"></i> Imagen</button>
     <button onclick="imprimir()" title="Imprimir el plano"><i class="bi bi-printer"></i> Imprimir</button>
   <button onclick="abrirMateriales()" title="Resumen de materiales (presupuesto)"><i class="bi bi-clipboard-data"></i> Materiales</button>
+  <button onclick="abrirFoto()" title="Poner una foto de fondo para calcar el plano encima"><i class="bi bi-image-fill"></i> Foto</button>
     <div class="sep"></div>
     <button id="tgRejilla" class="toggle on" onclick="alternarRejilla()" title="Mostrar u ocultar la cuadrícula de fondo"><i class="bi bi-grid-3x3"></i> Rejilla</button>
     <button id="tgIman" class="toggle on" onclick="alternarIman()" title="IMÁN: hace que lo que dibujas se pegue a la cuadrícula para que quede alineado y recto"><i class="bi bi-magnet"></i> Imán</button>
     <button id="tgOrtho" class="toggle on" onclick="alternarOrtho()" title="90°: obliga a que las paredes salgan rectas (horizontales o verticales)"><i class="bi bi-bounding-box"></i> 90°</button>
+  <label class="sel-medida" title="Dónde se muestran las medidas de las paredes"><i class="bi bi-rulers"></i> Medidas: <select onchange="posMedida=this.value; redibujar();"><option value="dentro">dentro</option><option value="encima">encima</option><option value="debajo">debajo</option></select></label>
     <button id="tgSim" class="toggle on" onclick="alternarSim()" title="Probar la instalación eléctrica: los cables y aparatos con corriente se iluminan"><i class="bi bi-lightning-charge-fill"></i> Probar</button>
     <button id="tgRed" class="toggle on" onclick="alternarRed()" title="Simular la red: cobertura WiFi y si llega la conexión a cada sitio"><i class="bi bi-wifi"></i> Red</button>
     <button class="btn-amarillo" onclick="abrir3D()" title="Ver el plano en 3 dimensiones"><i class="bi bi-badge-3d"></i> Ver en 3D</button>
@@ -370,6 +374,26 @@
   </div>
 </div>
 
+<!-- Foto de fondo -->
+<div class="fondo-oscuro" id="modalFoto" style="display:none;">
+  <div class="modal" style="max-width:440px;">
+    <h2>📷 Foto de fondo (para calcar)</h2>
+    <p class="ayuda-txt" style="margin-top:0">Pon una foto del plano debajo de la cuadrícula y dibuja encima.</p>
+    <div style="margin-bottom:12px;"><button class="btn-azul" style="width:100%" onclick="document.getElementById('inpFoto').click()"><i class="bi bi-upload"></i> Cargar foto</button>
+      <input type="file" id="inpFoto" accept="image/*" style="display:none" onchange="cargarFotoFondo(this)"></div>
+    <div id="fotoCtrls" style="display:none">
+      <label style="font-weight:700">Transparencia</label><input type="range" id="fOpac" min="10" max="100" value="50" oninput="setFotoOpac(this.value)" style="width:100%">
+      <label style="font-weight:700">Tamaño</label><input type="range" id="fTam" min="10" max="400" value="100" oninput="setFotoTam(this.value)" style="width:100%">
+      <div class="modal-botones" style="margin-top:10px">
+        <button class="btn-azul" onclick="modoMoverFoto()"><i class="bi bi-arrows-move"></i> Mover</button>
+        <button id="btnFotoVis" onclick="toggleFotoVisible()">Ocultar</button>
+        <button class="btn-rojo" onclick="quitarFoto()"><i class="bi bi-trash"></i></button>
+      </div>
+    </div>
+    <div class="modal-botones" style="margin-top:12px"><button class="btn-verde" onclick="cerrar('modalFoto')">Cerrar</button></div>
+  </div>
+</div>
+
 <!-- Vista 3D -->
 <div id="modal3d">
   <div class="barra3d">
@@ -478,6 +502,7 @@
     cota:'Arrastra entre dos puntos para medir la distancia',
     cable:'Toca para ir poniendo puntos del cable. Conecta Cuadro → Interruptor → Luz. Doble toque o Enter para terminar.',
     cablered:'Cable de red: toca punto a punto para conectar Router → roseta/ordenador. Doble toque o Enter para terminar.',
+    fotomover:'Arrastra para mover la foto de fondo. Cuando esté bien, elige otra herramienta.',
     texto:'Toca donde quieras escribir',
     simbolo:'Toca donde quieras colocarlo. Luego puedes girarlo en el panel derecho.'
   };
@@ -514,6 +539,7 @@
   let simRed = true;              // mostrar simulación de red/datos (cobertura WiFi)
   let redRes = null;              // resultado de la última simulación de red
   let guias = [];                 // guías de alineación al mover
+  let posMedida = 'dentro';       // dónde van las medidas de la pared: dentro / encima / debajo
   const COL_CABLE = { normal:'#475569', luz:'#f59e0b', enchufes:'#dc2626', fase:'#7c2d12', tierra:'#16a34a', datos:'#7c3aed' };
   const TIPOS_CABLE = [['normal','Normal'],['luz','Iluminación'],['enchufes','Enchufes'],['fase','Fase'],['tierra','Tierra'],['datos','Datos']];
 
@@ -756,6 +782,7 @@
     redRes = simRed ? calcularRed() : null;
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.clearRect(0,0,anchoCss(),altoCss());
+    dibujarFondo();
     if(verRejilla) dibujarRejilla();
     // planta inferior como guía (calcar)
     if(verInferior && plantaActual>0){
@@ -774,6 +801,7 @@
         ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fill();
       });
     }
+    if(CAPAS.construccion.visible) dibujarAreas();
     objetos.forEach(o=>{ if(CAPAS[o.capa].visible) dibujarObjeto(o,false); });
     if(dibujando) dibujarObjeto(dibujando,true);
     if(cableActual) dibujarObjeto(cableActual,true);
@@ -784,6 +812,37 @@
     actualizarEstado();
   }
   function fmtMcorto(m){ return (Math.round(m*10)/10).toString().replace('.',',')+'m'; }
+  // detecta espacios cerrados con paredes y calcula sus m²
+  function detectarAreas(){
+    const tol=GRID*0.5; const nodos=[];
+    const idDe=(x,y)=>{ for(let i=0;i<nodos.length;i++){ if(Math.hypot(nodos[i].x-x,nodos[i].y-y)<tol) return i; } nodos.push({x,y,adj:new Set()}); return nodos.length-1; };
+    objetos.forEach(o=>{ if(o.tipo!=='pared') return; const a=idDe(o.x1,o.y1), b=idDe(o.x2,o.y2); if(a!==b){ nodos[a].adj.add(b); nodos[b].adj.add(a); } });
+    const vis=new Array(nodos.length).fill(false); const out=[];
+    for(let i=0;i<nodos.length;i++){ if(vis[i]) continue;
+      const comp=[]; const st=[i]; vis[i]=true; while(st.length){ const n=st.pop(); comp.push(n); nodos[n].adj.forEach(m=>{ if(!vis[m]){vis[m]=true; st.push(m);} }); }
+      if(comp.length>=3 && comp.every(n=>nodos[n].adj.size===2)){
+        const orden=[comp[0]]; let prev=-1,cur=comp[0];
+        while(orden.length<comp.length){ const sig=[...nodos[cur].adj].find(m=>m!==prev); if(sig===undefined||sig===comp[0]) break; orden.push(sig); prev=cur; cur=sig; }
+        if(orden.length===comp.length && nodos[cur].adj.has(comp[0])){
+          let area=0,cx=0,cy=0; for(let k=0;k<orden.length;k++){ const p=nodos[orden[k]],q=nodos[orden[(k+1)%orden.length]]; area+=p.x*q.y-q.x*p.y; cx+=p.x; cy+=p.y; }
+          const f=metrosPorCuadro/GRID; out.push({m2:Math.abs(area)/2*f*f, cx:cx/orden.length, cy:cy/orden.length, poly:orden.map(n=>({x:nodos[n].x,y:nodos[n].y}))});
+        }
+      }
+    }
+    return out;
+  }
+  function dibujarAreas(){
+    detectarAreas().forEach(A=>{ if(A.m2<0.1) return;
+      ctx.save();
+      ctx.beginPath(); A.poly.forEach((p,k)=>{ const s=aPantalla(p.x,p.y); k?ctx.lineTo(s.x,s.y):ctx.moveTo(s.x,s.y); }); ctx.closePath();
+      ctx.fillStyle='rgba(37,99,235,.05)'; ctx.fill();
+      const c=aPantalla(A.cx,A.cy), t=fM2(A.m2);
+      ctx.font='bold 14px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      const w=ctx.measureText(t).width+12; ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fillRect(c.x-w/2,c.y-11,w,22);
+      ctx.fillStyle='#1d4ed8'; ctx.fillText(t,c.x,c.y);
+      ctx.restore();
+    });
+  }
   function dibujarReglas(){
     if(esMovil()) return;
     const H=16, Wl=32, W=anchoCss(), Hc=altoCss(); const paso5=GRID*vista.escala*5;
@@ -817,6 +876,15 @@
     const g=[]; if(gx!==null)g.push({x:gx}); if(gy!==null)g.push({y:gy}); return g;
   }
 
+  let _imgFondo=null;
+  function dibujarFondo(){
+    const f = plantas[plantaActual] && plantas[plantaActual].fondo;
+    if(!f || !f.src || f.visible===false) return;
+    if(!_imgFondo || _imgFondo._src!==f.src){ _imgFondo=new Image(); _imgFondo._src=f.src; _imgFondo.onload=()=>redibujar(); _imgFondo.src=f.src; }
+    if(!_imgFondo.complete || !_imgFondo.naturalWidth) return;
+    const p=aPantalla(f.x,f.y); const w=_imgFondo.naturalWidth*(f.escala||1)*vista.escala, h=_imgFondo.naturalHeight*(f.escala||1)*vista.escala;
+    ctx.save(); ctx.globalAlpha=(f.opacidad!=null?f.opacidad:0.5); ctx.drawImage(_imgFondo,p.x,p.y,w,h); ctx.restore();
+  }
   function dibujarRejilla(){
     const paso=GRID*vista.escala;
     if(paso<6) return;
@@ -859,9 +927,10 @@
     // línea central clara para dar aspecto de muro
     ctx.strokeStyle='rgba(255,255,255,.15)'; ctx.lineWidth=Math.max(1,g*0.25);
     ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
-    // longitud
+    // longitud (posición configurable: dentro / encima / debajo)
     const largoM=pxM(Math.hypot(o.x2-o.x1,o.y2-o.y1));
-    if(largoM>0.05) etiquetaLinea(a,b,fM(largoM),'#1d4ed8');
+    const off = posMedida==='encima' ? -(GROSOR_PARED*vista.escala*0.5+11) : (posMedida==='debajo' ? (GROSOR_PARED*vista.escala*0.5+11) : 0);
+    if(largoM>0.05) etiquetaLinea(a,b,fM(largoM),'#1d4ed8',off);
   }
 
   function dibHabitacion(o){
@@ -885,14 +954,16 @@
 
   function dibPuerta(o){
     const p=aPantalla(o.x,o.y); const s=mPx(o.ancho||0.8)*vista.escala;
-    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((o.ang||0)*Math.PI/180);
+    const ap=(o.apertura!=null?o.apertura:90)*Math.PI/180;   // ángulo de apertura
+    const sh=o.flipH?-1:1, sv=o.flipV?-1:1;                   // invertir lado / apertura
+    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((o.ang||0)*Math.PI/180); ctx.scale(sh,sv);
     // hueco (corta la pared con blanco)
     ctx.strokeStyle='#fafafa'; ctx.lineWidth=(GROSOR_PARED+2)*vista.escala; ctx.lineCap='butt';
     ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s,0); ctx.stroke();
-    // hoja + arco
-    ctx.strokeStyle='#92400e'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-s); ctx.stroke();
-    ctx.beginPath(); ctx.arc(0,0,s,-Math.PI/2,0); ctx.stroke();
+    // hoja (a 'ap' grados desde la pared) + arco de barrido
+    ctx.strokeStyle='#92400e'; ctx.lineWidth=2; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s*Math.cos(-ap), s*Math.sin(-ap)); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,s,-ap,0); ctx.stroke();
     ctx.restore();
   }
   function dibVentana(o){
@@ -1020,8 +1091,9 @@
     ctx.moveTo(a.x,a.y); ctx.lineTo(a.x+9*Math.cos(ang-0.4),a.y+9*Math.sin(ang-0.4));
     ctx.stroke();
   }
-  function etiquetaLinea(a,b,txt,color){
-    const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+  function etiquetaLinea(a,b,txt,color,off){
+    let mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+    if(off){ const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1; mx+=(-dy/len)*off; my+=(dx/len)*off; }
     ctx.font='bold 13px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='middle';
     const w=ctx.measureText(txt).width+10;
     ctx.fillStyle='rgba(255,255,255,.9)'; ctx.fillRect(mx-w/2,my-10,w,20);
@@ -1040,15 +1112,16 @@
   function lin(c,x1,y1,x2,y2,col,gr){ c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.strokeStyle=col; c.lineWidth=gr||2.5; c.stroke(); }
 
   // Eléctrico (verde)
-  function dEnchufe(c,w,h){ const r=w/2; const col='#16a34a'; c.beginPath(); c.arc(0,0,r,Math.PI,0); c.strokeStyle=col;c.lineWidth=3;c.stroke(); lin(c,-r,0,r,0,col,3); lin(c,-r*0.4,0,-r*0.4,r*0.5,col,3); lin(c,r*0.4,0,r*0.4,r*0.5,col,3); }
-  function dEnchufe2(c,w,h){ dEnchufe(c,h,h); c.save(); c.translate(h*0.7,0); dEnchufe(c,h,h); c.restore(); }
-  function dInterruptor(c,w,h){ const r=w/2; cir(c,0,0,r,'#16a34a'); lin(c,0,0,r,-r,'#16a34a',3); c.fillStyle='#16a34a'; c.font=`${w*0.5}px Segoe UI`; c.textAlign='center';c.textBaseline='middle'; }
-  function dConmutador(c,w,h){ const r=h/2; cir(c,0,0,r,'#16a34a'); lin(c,0,0,r,-r,'#16a34a',3); lin(c,0,0,r,-r*0.4,'#16a34a',3); }
-  function dLuz(c,w,h){ const r=w/2; cir(c,0,0,r,'#f59e0b'); const d=r*0.7; lin(c,-d,-d,d,d,'#f59e0b',2.5); lin(c,d,-d,-d,d,'#f59e0b',2.5); }
-  function dAplique(c,w,h){ const r=h*0.7; c.beginPath();c.arc(0,0,r,Math.PI,0);c.strokeStyle='#f59e0b';c.lineWidth=2.5;c.stroke(); lin(c,-r,0,r,0,'#f59e0b',2.5); lin(c,-r*0.5,0,r*0.5,r*0.6,'#f59e0b',2); }
-  function dCuadro(c,w,h){ rc(c,-w/2,-h/2,w,h,'#dc2626','#fee2e2'); c.fillStyle='#dc2626'; c.font=`bold ${h*0.6}px Segoe UI`; c.textAlign='center'; c.textBaseline='middle'; c.fillText('⚡',0,0); }
-  function dTomaTV(c,w,h){ const r=w/2; cir(c,0,0,r,'#16a34a'); c.fillStyle='#16a34a'; c.font=`bold ${w*0.45}px Segoe UI`;c.textAlign='center';c.textBaseline='middle'; c.fillText('TV',0,0); }
-  function dTomaRed(c,w,h){ const r=w/2; cir(c,0,0,r,'#16a34a'); c.fillStyle='#16a34a'; c.font=`bold ${w*0.4}px Segoe UI`;c.textAlign='center';c.textBaseline='middle'; c.fillText('RJ',0,0); }
+  // --- símbolos eléctricos normalizados (estilo plano profesional) ---
+  function dEnchufe(c,w,h){ const r=w/2,col='#16a34a'; c.beginPath(); c.arc(0,0,r,Math.PI,2*Math.PI); c.strokeStyle=col; c.lineWidth=2.5; c.stroke(); lin(c,-r,0,r,0,col,2.5); lin(c,0,0,0,-r,col,2.5); }
+  function dEnchufe2(c,w,h){ const r=h/2,col='#16a34a'; lin(c,-r*1.7,0,r*1.7,0,col,2.5); [-r*0.85,r*0.85].forEach(cx=>{ c.beginPath(); c.arc(cx,0,r,Math.PI,2*Math.PI); c.strokeStyle=col; c.lineWidth=2.5; c.stroke(); lin(c,cx,0,cx,-r,col,2.5); }); }
+  function dInterruptor(c,w,h){ const r=w/2,col='#16a34a'; c.beginPath(); c.arc(0,0,r*0.42,0,7); c.fillStyle=col; c.fill(); lin(c,r*0.3,-r*0.3,r,-r,col,2.5); }
+  function dConmutador(c,w,h){ const r=w/2,col='#16a34a'; c.beginPath(); c.arc(0,0,r*0.42,0,7); c.fillStyle=col; c.fill(); lin(c,r*0.28,-r*0.28,r,-r,col,2.5); lin(c,r*0.28,-r*0.28,r,-r*0.4,col,2.5); }
+  function dLuz(c,w,h){ const r=w/2,col='#f59e0b'; cir(c,0,0,r,col); const d=r*0.72; lin(c,-d,-d,d,d,col,2.2); lin(c,d,-d,-d,d,col,2.2); }
+  function dAplique(c,w,h){ const col='#f59e0b'; const r=Math.min(w,h)*0.38; lin(c,-w/2,h*0.32,w/2,h*0.32,col,2.5); cir(c,0,0,r,col); const d=r*0.7; lin(c,-d,-d,d,d,col,2); lin(c,d,-d,-d,d,col,2); lin(c,0,r,0,h*0.32,col,2); }
+  function dCuadro(c,w,h){ const col='#dc2626'; rc(c,-w/2,-h/2,w,h,col,'#fff'); c.fillStyle=col; c.beginPath(); c.moveTo(-w/2,-h/2); c.lineTo(0,-h/2); c.lineTo(0,h/2); c.lineTo(-w/2,h/2); c.closePath(); c.fill(); }
+  function dTomaTV(c,w,h){ const r=w/2,col='#16a34a'; c.beginPath(); c.arc(0,0,r,Math.PI,2*Math.PI); c.strokeStyle=col; c.lineWidth=2.5; c.stroke(); lin(c,-r,0,r,0,col,2.5); c.fillStyle=col; c.font=`bold ${w*0.4}px Segoe UI`; c.textAlign='center'; c.textBaseline='middle'; c.fillText('TV',0,-r*0.45); }
+  function dTomaRed(c,w,h){ const r=w/2,col='#16a34a'; c.beginPath(); c.moveTo(-r,-r*0.55); c.lineTo(r,-r*0.55); c.lineTo(0,r*0.8); c.closePath(); c.strokeStyle=col; c.lineWidth=2.5; c.stroke(); }
 
   // Fontanería (azul)
   function dInodoro(c,w,h){ const col='#0ea5e9'; rc(c,-w/2,-h/2,w,h*0.25,col,'#e0f2fe'); c.beginPath(); c.ellipse(0,h*0.1,w*0.42,h*0.32,0,0,7); c.fillStyle='#e0f2fe';c.fill();c.strokeStyle=col;c.lineWidth=2.5;c.stroke(); }
@@ -1194,6 +1267,7 @@
     if(e.button!==undefined && e.button!==0) return; // ignorar otros botones (derecho, etc.)
 
     if(herramienta==='mano'){ accion={tipo:'vista',px,py,ox:vista.x,oy:vista.y}; return; }
+    if(herramienta==='fotomover'){ const f=plantas[plantaActual].fondo; if(f){ accion={tipo:'foto',px,py,ox:f.x,oy:f.y}; } return; }
 
     if(herramienta==='seleccionar'){
       const tir=tiradorEn(m.x,m.y);
@@ -1277,6 +1351,7 @@
       dibujando.x2=ex; dibujando.y2=ey; redibujar(); return;
     }
     if(accion.tipo==='vista'){ vista.x=accion.ox+(px-accion.px); vista.y=accion.oy+(py-accion.py); redibujar(); return; }
+    if(accion.tipo==='foto'){ const f=plantas[plantaActual].fondo; if(f){ f.x=accion.ox+(px-accion.px)/vista.escala; f.y=accion.oy+(py-accion.py)/vista.escala; autoguardar(); redibujar(); } return; }
     if(accion.tipo==='banda'){ accion.x1=m.x; accion.y1=m.y; redibujar(); return; }
     if(accion.tipo==='mover'){
       const ddx=m.x-accion.px, ddy=m.y-accion.py;
@@ -1406,7 +1481,7 @@
     actualizarChip();
     redibujar();
   }
-  const ICO_HERR={mano:['✋','Mover vista'],pared:['🧱','Pared'],habitacion:['⬛','Habitación'],puerta:['🚪','Puerta'],ventana:['🪟','Ventana'],cota:['📏','Medida'],cable:['➰','Cable'],cablered:['🌐','Cable de red'],texto:['🔤','Texto']};
+  const ICO_HERR={mano:['✋','Mover vista'],pared:['🧱','Pared'],habitacion:['⬛','Habitación'],puerta:['🚪','Puerta'],ventana:['🪟','Ventana'],cota:['📏','Medida'],cable:['➰','Cable'],cablered:['🌐','Cable de red'],texto:['🔤','Texto'],fotomover:['🖼️','Mover foto']};
   function actualizarChip(){
     const chip=document.getElementById('selChip'); if(!chip) return;
     if(herramienta && herramienta!=='seleccionar'){
@@ -1512,6 +1587,10 @@
     } else if(o.tipo==='puerta'||o.tipo==='ventana'){
       html+=propNum('Ancho (m)','ancho',o.ancho||0.8);
       html+=propNum('Giro (°)','ang',Math.round(o.ang||0));
+      if(o.tipo==='puerta'){
+        html+=`<div class="prop-acciones"><button onclick="voltearPuerta('${o.id}','H')">↔️ Invertir lado</button><button onclick="voltearPuerta('${o.id}','V')">↕️ Invertir apertura</button></div>`;
+        html+=`<div class="prop-fila"><label>Apertura: <b id="lblAlc">${o.apertura!=null?o.apertura:90}°</b></label><input type="range" min="10" max="180" step="5" value="${o.apertura!=null?o.apertura:90}" oninput="setApertura('${o.id}',this.value)"></div>`;
+      }
     } else if(o.tipo==='simbolo'){
       const s=SIMBOLOS[o.clave];
       html+=`<div class="prop-fila"><b>${s.nombre}</b><label>Tamaño normal: ${fM(s.m[0])} × ${fM(s.m[1])}</label></div>`;
@@ -1584,6 +1663,19 @@
   function toggleInterruptor(id){ const o=objetos.find(x=>x.id===id); if(!o) return; guardarHistorial(); o.encendido=!(o.encendido!==false); mostrarPropiedades(); redibujar(); }
   function toggleWifi(id){ const o=objetos.find(x=>x.id===id); if(!o) return; guardarHistorial(); o.wifi=!(o.wifi!==false); mostrarPropiedades(); redibujar(); }
   function setAlcance(id,v){ const o=objetos.find(x=>x.id===id); if(!o) return; o.alcance=parseInt(v)||10; const l=document.getElementById('lblAlc'); if(l) l.textContent=o.alcance+' m'; autoguardar(); redibujar(); }
+  function voltearPuerta(id,eje){ const o=objetos.find(x=>x.id===id); if(!o) return; guardarHistorial(); if(eje==='H') o.flipH=!o.flipH; else o.flipV=!o.flipV; redibujar(); }
+  function setApertura(id,v){ const o=objetos.find(x=>x.id===id); if(!o) return; o.apertura=parseInt(v)||90; const l=document.getElementById('lblAlc'); if(l) l.textContent=o.apertura+'°'; autoguardar(); redibujar(); }
+  /* ---- foto de fondo ---- */
+  function abrirFoto(){ const f=plantas[plantaActual].fondo; const c=document.getElementById('fotoCtrls'); c.style.display=(f&&f.src)?'block':'none';
+    if(f&&f.src){ document.getElementById('fOpac').value=Math.round((f.opacidad!=null?f.opacidad:0.5)*100); document.getElementById('fTam').value=Math.round((f.escala||1)*100); document.getElementById('btnFotoVis').textContent=(f.visible!==false)?'Ocultar':'Mostrar'; }
+    abrir('modalFoto'); }
+  function cargarFotoFondo(input){ const file=input.files[0]; if(!file) return; if(file.size>3000000){ alert('La foto es muy grande (máx ~3 MB). Usa una más ligera.'); input.value=''; return; }
+    const r=new FileReader(); r.onload=()=>{ const c=aMundo(anchoCss()*0.25,altoCss()*0.2); plantas[plantaActual].fondo={src:r.result,x:c.x,y:c.y,escala:1,opacidad:0.5,visible:true}; _imgFondo=null; document.getElementById('fotoCtrls').style.display='block'; document.getElementById('fOpac').value=50; document.getElementById('fTam').value=100; document.getElementById('btnFotoVis').textContent='Ocultar'; autoguardar(); redibujar(); }; r.readAsDataURL(file); input.value=''; }
+  function setFotoOpac(v){ const f=plantas[plantaActual].fondo; if(!f) return; f.opacidad=v/100; autoguardar(); redibujar(); }
+  function setFotoTam(v){ const f=plantas[plantaActual].fondo; if(!f) return; f.escala=v/100; autoguardar(); redibujar(); }
+  function toggleFotoVisible(){ const f=plantas[plantaActual].fondo; if(!f) return; f.visible=!(f.visible!==false); document.getElementById('btnFotoVis').textContent=(f.visible!==false)?'Ocultar':'Mostrar'; autoguardar(); redibujar(); }
+  function modoMoverFoto(){ elegir('fotomover'); cerrar('modalFoto'); }
+  function quitarFoto(){ if(confirm('¿Quitar la foto de fondo?')){ plantas[plantaActual].fondo=null; _imgFondo=null; document.getElementById('fotoCtrls').style.display='none'; autoguardar(); redibujar(); } }
   function alternarSim(){ simulando=!simulando; document.getElementById('tgSim').classList.toggle('on',simulando); mostrarPropiedades(); redibujar(); }
   function alternarRed(){ simRed=!simRed; document.getElementById('tgRed').classList.toggle('on',simRed); mostrarPropiedades(); redibujar(); }
 
@@ -1825,7 +1917,7 @@
   let nombreActual='';
   function planos(){ try{return JSON.parse(localStorage.getItem(CLAVE))||{};}catch(e){return {};} }
   function setPlanos(p){ localStorage.setItem(CLAVE,JSON.stringify(p)); }
-  function autoguardar(){ localStorage.setItem('planoBorrador',JSON.stringify({plantas:plantas.map(p=>({nombre:p.nombre,objetos:p.objetos})), plantaActual, metrosPorCuadro})); }
+  function autoguardar(){ try{ localStorage.setItem('planoBorrador',JSON.stringify({plantas:plantas.map(p=>({nombre:p.nombre,objetos:p.objetos,fondo:p.fondo})), plantaActual, metrosPorCuadro})); }catch(e){} }
 
   /* ---- gestión de plantas ---- */
   function cambiarPlanta(i){ if(i<0||i>=plantas.length) return; plantaActual=i; objetos=plantas[i].objetos; historial.length=0; rehacer.length=0; seleccion=[]; actualizarPlantas(); mostrarPropiedades(); redibujar(); }
@@ -1845,7 +1937,7 @@
     const nombre=document.getElementById('nombrePlano').value.trim();
     if(!nombre){ alert('Ponle un nombre al plano.'); return; }
     const todos=planos();
-    todos[nombre]={plantas:plantas.map(p=>({nombre:p.nombre, objetos:p.objetos})), metrosPorCuadro, fecha:Date.now(), miniatura:generarMiniatura()};
+    todos[nombre]={plantas:plantas.map(p=>({nombre:p.nombre, objetos:p.objetos, fondo:p.fondo})), metrosPorCuadro, fecha:Date.now(), miniatura:generarMiniatura()};
     setPlanos(todos); nombreActual=nombre; actualizarNombre(); cerrar('modalGuardar');
   }
   function generarMiniatura(){
@@ -1883,7 +1975,7 @@
     abrir('modalCargar');
   }
   function cargarPlano(n){ const p=planos()[n]; if(p){
-    if(p.plantas && p.plantas.length){ plantas=p.plantas.map(pl=>({nombre:pl.nombre, objetos:pl.objetos||[]})); }
+    if(p.plantas && p.plantas.length){ plantas=p.plantas.map(pl=>({nombre:pl.nombre, objetos:pl.objetos||[], fondo:pl.fondo||null})); }
     else { plantas=[{nombre:'Planta baja', objetos:p.objetos||[]}]; }   // compatibilidad con planos antiguos
     plantaActual=0; objetos=plantas[0].objetos;
     metrosPorCuadro=p.metrosPorCuadro||0.5; document.getElementById('selEscala').value=metrosPorCuadro;
@@ -1987,7 +2079,7 @@
   centrarVista();
   // recuperar borrador
   try{ const b=JSON.parse(localStorage.getItem('planoBorrador')); if(b){
-    if(b.plantas && b.plantas.length){ plantas=b.plantas.map(p=>({nombre:p.nombre, objetos:p.objetos||[]})); plantaActual=Math.min(b.plantaActual||0, plantas.length-1); objetos=plantas[plantaActual].objetos; }
+    if(b.plantas && b.plantas.length){ plantas=b.plantas.map(p=>({nombre:p.nombre, objetos:p.objetos||[], fondo:p.fondo||null})); plantaActual=Math.min(b.plantaActual||0, plantas.length-1); objetos=plantas[plantaActual].objetos; }
     else if(b.objetos && b.objetos.length){ plantas=[{nombre:'Planta baja', objetos:b.objetos}]; plantaActual=0; objetos=plantas[0].objetos; }
     metrosPorCuadro=b.metrosPorCuadro||0.5; document.getElementById('selEscala').value=metrosPorCuadro; ajustarVista();
   } }catch(e){}
