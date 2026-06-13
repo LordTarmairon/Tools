@@ -631,11 +631,19 @@
       if(!n.conduct) continue;
       n.edges.forEach(e=>{ e.energized=true; const m=e.a===n?e.b:e.a; if(!m.energized){ m.energized=true; cola.push(m); } });
     }
+    // COMPONENTES: todo lo conectado entre sí (sin importar interruptores) -> para "ver recorrido"
+    let comp=0; clusters.forEach(c=>c.comp=undefined);
+    clusters.forEach(c=>{ if(c.comp===undefined){ const st=[c]; c.comp=comp; while(st.length){ const n=st.pop(); n.edges.forEach(e=>{ const m=e.a===n?e.b:e.a; if(m.comp===undefined){ m.comp=comp; st.push(m); } }); } comp++; } });
+    const compDe=new Map(); clusters.forEach(c=>c.objs.forEach(o=>compDe.set(o.id,c.comp)));
+    const edgeComp=new Map(); edges.forEach(e=>{ if(e.cab) edgeComp.set(e.cab.id+'_'+e.seg, e.a.comp); });
     const edgeKey=new Map(); edges.forEach(e=>{ if(e.cab) edgeKey.set(e.cab.id+'_'+e.seg, e.energized); });
     const devEn=new Map(); clusters.forEach(c=>c.objs.forEach(o=>devEn.set(o.id,c.energized)));
-    // enchufes con corriente (para saber si un electrodoméstico cercano recibe corriente)
     const enchufesOn=[]; clusters.forEach(c=>{ if(c.energized) c.objs.forEach(o=>{ if(o.clave==='enchufe'||o.clave==='enchufe2') enchufesOn.push({x:o.x,y:o.y,piso:c.piso}); }); });
-    return {edgeKey, devEn, enchufesOn};
+    // CARGA por cuadro: vatios de los aparatos ENCENDIDOS de su componente (para avisar de sobrecarga)
+    const VAT_DEF={luz:60,aplique:60}; const wattsOn={};
+    clusters.forEach(c=>{ if(!c.energized) return; c.objs.forEach(o=>{ const w=(o.vatios!=null?o.vatios:(VAT_DEF[o.clave]||0)); if(w) wattsOn[c.comp]=(wattsOn[c.comp]||0)+w; }); });
+    const cargaCuadro=new Map(); clusters.forEach(c=>c.objs.forEach(o=>{ if(o.clave==='cuadro') cargaCuadro.set(o.id,{watts:wattsOn[c.comp]||0, voltaje:o.voltaje||230, amperaje:o.amperaje||25}); }));
+    return {edgeKey, devEn, enchufesOn, compDe, edgeComp, cargaCuadro};
   }
 
   /* =======================================================================
@@ -723,7 +731,12 @@
       cl.forEach(c=>{ if(c.fed && c.router===r) c.objs.forEach(o=>{ if(o.clave!=='router' && !ipDev.has(o.id)) ipDev.set(o.id,{ip:pre+(host++),subred:sub}); }); });
     });
     const prefijosDup=new Set(Object.keys(cnt).filter(k=>cnt[k]>1));
-    return {fedDev, redEdge, emisores, sig, ipDev, prefijosDup};
+    // color por subred: a cada cable de red se le da el color de su subred
+    const PAL_SUB=['#7c3aed','#0ea5e9','#16a34a','#ea580c','#db2777','#eab308']; const subColor={}; let ci=0;
+    const colDe=sub=>{ if(!subColor[sub]) subColor[sub]=PAL_SUB[ci++%PAL_SUB.length]; return subColor[sub]; };
+    const cableColor=new Map();
+    objetos.filter(o=>o.tipo==='cable'&&o.capa==='datos').forEach(cab=>{ for(const pt of cab.puntos){ const dev=objetos.find(o=>o.tipo==='simbolo'&&o.capa==='datos'&&Math.hypot(o.x-pt.x,o.y-pt.y)<tol); if(dev){ const ipi=ipDev.get(dev.id); if(ipi){ cableColor.set(cab.id,colDe(ipi.subred)); break; } } } });
+    return {fedDev, redEdge, emisores, sig, ipDev, prefijosDup, cableColor};
   }
 
   function redibujar(){
@@ -860,25 +873,49 @@
     ctx.fillStyle='#0f172a'; ctx.font=`bold ${(o.tam||16)*vista.escala}px Segoe UI`;
     ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(o.txt,p.x,p.y);
   }
+  function longitudCable(o){ let t=0; for(let i=0;i<o.puntos.length-1;i++) t+=pxM(Math.hypot(o.puntos[i+1].x-o.puntos[i].x, o.puntos[i+1].y-o.puntos[i].y)); return t; }
+  function extremoSuelto(cab,idx){
+    const pt=cab.puntos[idx]; const tol=GRID*0.7;
+    for(const o of objetos){ if(o.tipo==='simbolo'&&o.capa===cab.capa&&Math.hypot(o.x-pt.x,o.y-pt.y)<tol) return false; }
+    for(const o of objetos){ if(o.tipo==='cable'&&o.capa===cab.capa){ for(let k=0;k<o.puntos.length;k++){ if(o===cab && Math.abs(k-idx)<=1) continue; if(Math.hypot(o.puntos[k].x-pt.x,o.puntos[k].y-pt.y)<tol) return false; } } }
+    return true;
+  }
   function dibCable(o){
     if(o.puntos.length<1) return;
     const datos = o.capa==='datos';
-    const col=COL_CABLE[o.tipoCable||(datos?'datos':'normal')]||'#475569';
+    let col=COL_CABLE[o.tipoCable||(datos?'datos':'normal')]||'#475569';
+    if(datos && simRed && redRes && redRes.cableColor && redRes.cableColor.get(o.id)) col=redRes.cableColor.get(o.id);
+    // recorrido: si hay un aparato eléctrico seleccionado, resaltar su mismo circuito
+    const compSel = (!datos && seleccion.length===1 && seleccion[0].capa==='electrico' && simRes && simRes.compDe) ? simRes.compDe.get(seleccion[0].id) : null;
     for(let i=0;i<o.puntos.length-1;i++){
       const a=aPantalla(o.puntos[i].x,o.puntos[i].y), b=aPantalla(o.puntos[i+1].x,o.puntos[i+1].y);
+      if(compSel!=null && simRes.edgeComp.get(o.id+'_'+i)===compSel){
+        ctx.save(); ctx.strokeStyle='rgba(59,130,246,.35)'; ctx.lineWidth=11; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.restore();
+      }
       let on=false, glow='#facc15';
       if(datos){ on = !dibujandoFantasma && simRed && redRes && redRes.redEdge.get(o.id+'_'+i); glow='rgba(96,165,250,.95)'; }
       else { on = !dibujandoFantasma && simulando && simRes && simRes.edgeKey.get(o.id+'_'+i); glow='rgba(253,224,71,.95)'; }
       ctx.save();
       ctx.strokeStyle=col; ctx.lineWidth=on?3:2.5; ctx.setLineDash(on?[]:[8,5]);
       ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
-      if(on){ // núcleo brillante = conectado / con corriente
+      if(on){
         ctx.shadowColor=datos?'#3b82f6':'#facc15'; ctx.shadowBlur=14; ctx.strokeStyle=glow; ctx.lineWidth=2; ctx.setLineDash([]);
         ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
       }
       ctx.restore();
     }
     o.puntos.forEach(pt=>{ const p=aPantalla(pt.x,pt.y); ctx.fillStyle=col; ctx.beginPath(); ctx.arc(p.x,p.y,3.2,0,7); ctx.fill(); });
+    // extremos sueltos (no conectan a nada) en rojo
+    if(o!==cableActual && !dibujandoFantasma && (datos?simRed:simulando)){
+      const idxs=o.puntos.length>1?[0,o.puntos.length-1]:[0];
+      idxs.forEach(idx=>{ if(extremoSuelto(o,idx)){ const p=aPantalla(o.puntos[idx].x,o.puntos[idx].y);
+        ctx.save(); ctx.fillStyle='#dc2626'; ctx.beginPath(); ctx.arc(p.x,p.y,6,0,7); ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle='#fff'; ctx.stroke();
+        ctx.fillStyle='#fff'; ctx.font='bold 10px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('!',p.x,p.y); ctx.restore(); } });
+    }
+    // aviso de longitud >100 m en cables de red (límite Ethernet)
+    if(datos && o!==cableActual && simRed && o.puntos.length>1){ const m=longitudCable(o); if(m>100){ const mp=o.puntos[Math.floor(o.puntos.length/2)]; const p=aPantalla(mp.x,mp.y);
+      ctx.save(); ctx.font='bold 11px Segoe UI'; ctx.textAlign='center'; const t='⚠ '+Math.round(m)+' m (>100)'; const w=ctx.measureText(t).width+8;
+      ctx.fillStyle='#dc2626'; ctx.fillRect(p.x-w/2,p.y-9,w,18); ctx.fillStyle='#fff'; ctx.textBaseline='middle'; ctx.fillText(t,p.x,p.y); ctx.restore(); } }
   }
   function dibSimbolo(o){
     const s=SIMBOLOS[o.clave]; if(!s) return;
@@ -1152,10 +1189,18 @@
     if(herramienta==='cable'||herramienta==='cablered'){
       const cap = herramienta==='cablered'?'datos':'electrico';
       const tc  = herramienta==='cablered'?'datos':'normal';
-      if(!cableActual){ cableActual={id:idNuevo(),tipo:'cable',capa:cap,tipoCable:tc,puntos:[{x:sx,y:sy}]}; }
-      else { cableActual.puntos.push({x:sx,y:sy}); }
+      const pt = puntoConexion(m.x,m.y,cap);   // se engancha a aparatos/cables cercanos
+      if(!cableActual){ cableActual={id:idNuevo(),tipo:'cable',capa:cap,tipoCable:tc,puntos:[pt]}; }
+      else { cableActual.puntos.push(pt); }
       redibujar(); return;
     }
+  }
+  // devuelve el punto de conexión: el aparato o vértice de cable más cercano (misma capa), o el punto pegado a la rejilla
+  function puntoConexion(mx,my,capa){
+    const tol=GRID*0.7; let best=null, bd=tol;
+    objetos.forEach(o=>{ if(o.tipo==='simbolo'&&o.capa===capa){ const d=Math.hypot(o.x-mx,o.y-my); if(d<bd){ bd=d; best={x:o.x,y:o.y}; } } });
+    objetos.forEach(o=>{ if(o.tipo==='cable'&&o.capa===capa){ o.puntos.forEach(p=>{ const d=Math.hypot(p.x-mx,p.y-my); if(d<bd){ bd=d; best={x:p.x,y:p.y}; } }); } });
+    return best || {x:snap(mx), y:snap(my)};
   }
 
   function alMover(e){
@@ -1429,6 +1474,10 @@
       if(o.clave==='cuadro'){
         html+=propNum('Voltios (V)','voltaje',o.voltaje||230);
         html+=propNum('Amperios máx (A)','amperaje',o.amperaje||25);
+        if(simRes && simRes.cargaCuadro && simRes.cargaCuadro.get(o.id)){
+          const cg=simRes.cargaCuadro.get(o.id); const amp=cg.watts/(cg.voltaje||230); const sobre=amp>cg.amperaje;
+          html+=`<div class="prop-fila"><label>Carga encendida: <b style="color:${sobre?'#dc2626':'#16a34a'}">${cg.watts} W (${amp.toFixed(1)} A) de ${cg.amperaje} A</b>${sobre?'<br><b style="color:#dc2626">⚠️ ¡SOBRECARGA! Reduce aparatos o sube los amperios</b>':''}</label></div>`;
+        }
       }
       if(o.clave==='luz'||o.clave==='aplique'){ html+=propNum('Potencia (W)','vatios',o.vatios||60); }
       if(o.clave==='enchufe'||o.clave==='enchufe2'){ html+=propNum('Consumo (W)','vatios',o.vatios||0); }
