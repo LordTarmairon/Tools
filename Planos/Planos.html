@@ -229,6 +229,7 @@
     <div class="sep"></div>
     <button onclick="exportarPNG()" title="Guardar el plano como imagen"><i class="bi bi-image"></i> Imagen</button>
     <button onclick="imprimir()" title="Imprimir el plano"><i class="bi bi-printer"></i> Imprimir</button>
+  <button onclick="abrirMateriales()" title="Resumen de materiales (presupuesto)"><i class="bi bi-clipboard-data"></i> Materiales</button>
     <div class="sep"></div>
     <button id="tgRejilla" class="toggle on" onclick="alternarRejilla()" title="Mostrar u ocultar la cuadrícula de fondo"><i class="bi bi-grid-3x3"></i> Rejilla</button>
     <button id="tgIman" class="toggle on" onclick="alternarIman()" title="IMÁN: hace que lo que dibujas se pegue a la cuadrícula para que quede alineado y recto"><i class="bi bi-magnet"></i> Imán</button>
@@ -356,6 +357,16 @@
       <p><b>⬇️ Instalar app:</b> instala este programa en el equipo (o en el móvil) como una aplicación con su propio icono, para abrirlo sin navegador y usarlo sin conexión. El botón solo aparece cuando el navegador lo permite.</p>
     </div>
     <div class="modal-botones"><button class="btn-verde" onclick="cerrar('modalAyuda')">Entendido</button></div>
+  </div>
+</div>
+
+<!-- Materiales -->
+<div class="fondo-oscuro" id="modalMateriales" style="display:none;">
+  <div class="modal" style="max-width:480px;">
+    <h2>📋 Resumen de materiales</h2>
+    <p class="ayuda-txt" style="margin-top:0">Cuenta de todo el proyecto (todas las plantas).</p>
+    <div id="bomCont"></div>
+    <div class="modal-botones" style="margin-top:12px;"><button class="btn-rojo" onclick="cerrar('modalMateriales')">Cerrar</button><button class="btn-verde" onclick="imprimir()"><i class="bi bi-printer"></i> Imprimir con plano</button></div>
   </div>
 </div>
 
@@ -502,6 +513,7 @@
   let simRes = null;              // resultado de la última simulación eléctrica
   let simRed = true;              // mostrar simulación de red/datos (cobertura WiFi)
   let redRes = null;              // resultado de la última simulación de red
+  let guias = [];                 // guías de alineación al mover
   const COL_CABLE = { normal:'#475569', luz:'#f59e0b', enchufes:'#dc2626', fase:'#7c2d12', tierra:'#16a34a', datos:'#7c3aed' };
   const TIPOS_CABLE = [['normal','Normal'],['luz','Iluminación'],['enchufes','Enchufes'],['fase','Fase'],['tierra','Tierra'],['datos','Datos']];
 
@@ -767,7 +779,42 @@
     if(cableActual) dibujarObjeto(cableActual,true);
     seleccion.forEach(o=>dibujarSeleccion(o));
     if(accion && accion.tipo==='banda') dibujarBanda();
+    if(guias && guias.length) dibujarGuias();
+    dibujarReglas();
     actualizarEstado();
+  }
+  function fmtMcorto(m){ return (Math.round(m*10)/10).toString().replace('.',',')+'m'; }
+  function dibujarReglas(){
+    if(esMovil()) return;
+    const H=16, Wl=32, W=anchoCss(), Hc=altoCss(); const paso5=GRID*vista.escala*5;
+    if(paso5<24) return;
+    ctx.save();
+    ctx.fillStyle='rgba(248,250,252,.95)'; ctx.fillRect(0,0,W,H); ctx.fillRect(0,0,Wl,Hc);
+    ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1; ctx.fillStyle='#64748b'; ctx.font='9px Segoe UI'; ctx.textBaseline='middle';
+    ctx.textAlign='center';
+    for(let x=vista.x%paso5;x<W;x+=paso5){ if(x<Wl) continue; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); ctx.fillText(fmtMcorto(pxM(aMundo(x,0).x)),x,H/2); }
+    ctx.textAlign='left';
+    for(let y=vista.y%paso5;y<Hc;y+=paso5){ if(y<H) continue; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(Wl,y); ctx.stroke(); ctx.fillText(fmtMcorto(pxM(aMundo(0,y).y)),2,y); }
+    ctx.fillStyle='rgba(241,245,249,.98)'; ctx.fillRect(0,0,Wl,H);
+    ctx.restore();
+  }
+  function dibujarGuias(){
+    ctx.save(); ctx.strokeStyle='#ec4899'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
+    guias.forEach(g=>{ ctx.beginPath(); if(g.x!=null){ const sx=aPantalla(g.x,0).x; ctx.moveTo(sx,0); ctx.lineTo(sx,altoCss()); } else { const sy=aPantalla(0,g.y).y; ctx.moveTo(0,sy); ctx.lineTo(anchoCss(),sy); } ctx.stroke(); });
+    ctx.restore();
+  }
+  function trasladar(o,dx,dy){ if(o.x1!==undefined){o.x1+=dx;o.y1+=dy;o.x2+=dx;o.y2+=dy;} else if(o.puntos){o.puntos.forEach(p=>{p.x+=dx;p.y+=dy;});} else {o.x+=dx;o.y+=dy;} }
+  function ajustarAlineacion(o){
+    const tol=8/vista.escala; const c=cajaMundo(o); if(!c) return [];
+    const oxs=[c.x,c.x+c.w/2,c.x+c.w], oys=[c.y,c.y+c.h/2,c.y+c.h];
+    let gx=null,gy=null,dx=0,dy=0;
+    objetos.forEach(t=>{ if(t===o||seleccion.includes(t)) return; const k=cajaMundo(t); if(!k) return;
+      const txs=[k.x,k.x+k.w/2,k.x+k.w], tys=[k.y,k.y+k.h/2,k.y+k.h];
+      if(gx===null) oxs.forEach(ox=>txs.forEach(tx=>{ if(gx===null && Math.abs(ox-tx)<tol){ gx=tx; dx=tx-ox; } }));
+      if(gy===null) oys.forEach(oy=>tys.forEach(ty=>{ if(gy===null && Math.abs(oy-ty)<tol){ gy=ty; dy=ty-oy; } }));
+    });
+    if(dx||dy) trasladar(o,dx,dy);
+    const g=[]; if(gx!==null)g.push({x:gx}); if(gy!==null)g.push({y:gy}); return g;
   }
 
   function dibujarRejilla(){
@@ -1240,6 +1287,7 @@
         else if(o.puntos){ o.puntos=c.puntos.map(p=>({x:snap(p.x+ddx),y:snap(p.y+ddy)})); }
         else { o.x=snap(c.x+ddx); o.y=snap(c.y+ddy); }
       });
+      guias = (seleccion.length===1) ? ajustarAlineacion(seleccion[0]) : [];
       redibujar(); return;
     }
     if(accion.tipo==='tirador'){
@@ -1269,7 +1317,7 @@
         mostrarPropiedades();
       }
     }
-    accion=null; redibujar();
+    accion=null; guias=[]; redibujar();
     lienzo.style.cursor = espacio?'grab':(herramienta==='mano'?'grab':(herramienta==='seleccionar'?'default':'crosshair'));
     // móvil: un toque simple sobre un objeto (sin arrastrar) abre sus propiedades
     if(acc && acc.tipo==='mover' && !acc.movido && esMovil() && seleccion.length){ abrirProps(); }
@@ -1851,11 +1899,55 @@
     const data=renderExport(2);
     const a=document.createElement('a'); a.download=(nombreActual||'plano')+'.png'; a.href=data; a.click();
   }
+  function resumenMateriales(){
+    const r={enchufes:0,interruptores:0,luces:0,cuadros:0,tomas:0,subidas:0,router:0,ap:0,switchred:0,roseta:0,plc:0,pc:0,sanit:0,muebles:0,puertas:0,ventanas:0,habitaciones:0,m2:0,paredM:0,cableElec:{},cableRed:0};
+    plantas.forEach(pl=>pl.objetos.forEach(o=>{
+      if(o.tipo==='pared') r.paredM+=pxM(Math.hypot(o.x2-o.x1,o.y2-o.y1));
+      else if(o.tipo==='habitacion'){ r.habitaciones++; const w=pxM(Math.abs(o.x2-o.x1)),h=pxM(Math.abs(o.y2-o.y1)); r.m2+=w*h; r.paredM+=2*(w+h); }
+      else if(o.tipo==='puerta') r.puertas++;
+      else if(o.tipo==='ventana') r.ventanas++;
+      else if(o.tipo==='cable'){ const m=longitudCable(o); if(o.capa==='datos') r.cableRed+=m; else { const t=o.tipoCable||'normal'; r.cableElec[t]=(r.cableElec[t]||0)+m; } }
+      else if(o.tipo==='simbolo'){ const k=o.clave;
+        if(k==='enchufe'||k==='enchufe2')r.enchufes++; else if(k==='interruptor'||k==='conmutador')r.interruptores++;
+        else if(k==='luz'||k==='aplique')r.luces++; else if(k==='cuadro')r.cuadros++; else if(k==='tvtoma'||k==='redtoma')r.tomas++; else if(k==='subida')r.subidas++;
+        else if(k==='router')r.router++; else if(k==='ap')r.ap++; else if(k==='switchred')r.switchred++; else if(k==='roseta')r.roseta++; else if(k==='plc')r.plc++; else if(k==='pc')r.pc++;
+        else if(o.capa==='fontaneria')r.sanit++; else if(o.capa==='muebles')r.muebles++;
+      }
+    }));
+    return r;
+  }
+  function bomHtml(){
+    const r=resumenMateriales(); const f=(et,v)=> v?`<tr><td>${et}</td><td style="text-align:right;font-weight:700">${v}</td></tr>`:'';
+    const nomT={normal:'normal',luz:'iluminación',enchufes:'enchufes',fase:'fase',tierra:'tierra',datos:'datos'};
+    let cE=''; Object.keys(r.cableElec).forEach(t=>{ cE+=f('Cable '+(nomT[t]||t), fM(r.cableElec[t])); });
+    return `<table class="bom" style="width:100%;border-collapse:collapse">
+      <tr><th colspan="2">Construcción</th></tr>${f('Habitaciones',r.habitaciones)}${f('Superficie total',fM2(r.m2))}${f('Paredes (longitud)',fM(r.paredM))}${f('Puertas',r.puertas)}${f('Ventanas',r.ventanas)}
+      <tr><th colspan="2">Eléctrico</th></tr>${f('Cuadros',r.cuadros)}${f('Enchufes',r.enchufes)}${f('Interruptores',r.interruptores)}${f('Luces / apliques',r.luces)}${f('Tomas TV/datos',r.tomas)}${f('Subidas',r.subidas)}${cE}
+      <tr><th colspan="2">Red / Datos</th></tr>${f('Routers',r.router)}${f('Puntos de acceso',r.ap)}${f('Switches',r.switchred)}${f('Rosetas',r.roseta)}${f('PLC',r.plc)}${f('Ordenadores',r.pc)}${f('Cable de red',fM(r.cableRed))}
+      <tr><th colspan="2">Otros</th></tr>${f('Sanitarios',r.sanit)}${f('Muebles',r.muebles)}</table>`;
+  }
+  function leyendaHtml(){
+    const us=new Set(); let pared=false,puerta=false,vent=false,cota=false;
+    objetos.forEach(o=>{ if(o.tipo==='simbolo')us.add(o.clave); else if(o.tipo==='pared')pared=true; else if(o.tipo==='puerta')puerta=true; else if(o.tipo==='ventana')vent=true; else if(o.tipo==='cota')cota=true; });
+    const it=[]; if(pared)it.push('🧱 Pared'); if(puerta)it.push('🚪 Puerta'); if(vent)it.push('🪟 Ventana'); if(cota)it.push('📏 Medida');
+    [...us].forEach(k=>{ if(SIMBOLOS[k]) it.push((ICONOS_SIMB[k]||'▫️')+' '+SIMBOLOS[k].nombre); });
+    return it.map(t=>`<span style="display:inline-block;margin:2px 12px 2px 0">${t}</span>`).join('')||'(sin elementos)';
+  }
+  function abrirMateriales(){ document.getElementById('bomCont').innerHTML=bomHtml(); abrir('modalMateriales'); }
   function imprimir(){
     const data=renderExport(2);
-    const w=window.open(''); w.document.write(`<html><head><title>${nombreActual||'Plano'}</title></head>
-    <body style="margin:0;text-align:center;font-family:Segoe UI"><h2>${escaparHtml(nombreActual||'Plano')}</h2>
-    <img src="${data}" style="max-width:100%"><script>window.onload=()=>{window.print();}<\/script></body></html>`);
+    const fecha=new Date().toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'});
+    const w=window.open('');
+    w.document.write(`<html><head><title>${escaparHtml(nombreActual||'Plano')}</title>
+    <style>body{font-family:Segoe UI,Arial;margin:18px;color:#0f172a}.cajetin{border:2px solid #334155;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.cajetin h1{font-size:21px;margin:0}.cajetin .meta{font-size:13px;text-align:right;color:#334155}img{max-width:100%;border:1px solid #cbd5e1;border-radius:6px}.sec{font-weight:700;margin:16px 0 5px;color:#1d4ed8}.ley span{font-size:13px}table.bom{font-size:13px}table.bom th{text-align:left;background:#eef2f7;padding:5px 7px;color:#1d4ed8}table.bom td{padding:3px 7px;border-bottom:1px solid #eee}</style>
+    </head><body>
+      <div class="cajetin"><div><h1>${escaparHtml(nombreActual||'Plano sin nombre')}</h1><div style="font-size:13px;color:#334155">Plano de vivienda</div></div>
+        <div class="meta">Fecha: ${fecha}<br>Escala: 1 cuadro = ${fM(metrosPorCuadro)}<br>Plantas: ${plantas.length}</div></div>
+      <img src="${data}">
+      <div class="sec">Leyenda</div><div class="ley">${leyendaHtml()}</div>
+      <div class="sec">Resumen de materiales</div>${bomHtml()}
+      <script>window.onload=()=>setTimeout(()=>window.print(),350)<\/script>
+    </body></html>`);
     w.document.close();
   }
   function renderExport(mult){
