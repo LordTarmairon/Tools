@@ -138,6 +138,9 @@
     .modal input[type=text], .modal select{width:100%; font-size:17px; padding:11px; border:2px solid var(--borde); border-radius:10px; margin-bottom:14px; color:var(--texto);}
     .modal-botones{display:flex; gap:10px; margin-top:6px;}
     .modal-botones button{flex:1; font-size:16px; padding:13px;}
+    /* botones dentro de ventanas sin color propio: legibles (no blanco sobre blanco) */
+    .modal button:not([class*="btn-"]){ background:#e2e8f0; color:#0f172a; }
+    .modal input[type=range]{ accent-color:var(--azul); }
     .grid-planos{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-bottom:14px;}
     .tarjeta-plano{border:2px solid var(--borde); border-radius:12px; overflow:hidden; cursor:pointer; transition:.15s; background:#fff;}
     .tarjeta-plano:hover{border-color:var(--azul); transform:translateY(-3px); box-shadow:0 6px 16px rgba(0,0,0,.15);}
@@ -232,7 +235,6 @@
     <button id="btnDeshacer" onclick="deshacer()" title="Deshacer el último cambio (Ctrl+Z)"><i class="bi bi-arrow-counterclockwise"></i></button>
     <button id="btnRehacer" onclick="rehacerAccion()" title="Rehacer (Ctrl+Y)"><i class="bi bi-arrow-clockwise"></i></button>
     <div class="sep"></div>
-    <button onclick="exportarPNG()" title="Guardar el plano como imagen"><i class="bi bi-image"></i> Imagen</button>
     <button onclick="imprimir()" title="Imprimir el plano"><i class="bi bi-printer"></i> Imprimir</button>
   <button onclick="abrirMateriales()" title="Resumen de materiales (presupuesto)"><i class="bi bi-clipboard-data"></i> Materiales</button>
   <button onclick="abrirFoto()" title="Poner una foto de fondo para calcar el plano encima"><i class="bi bi-image-fill"></i> Foto</button>
@@ -397,6 +399,19 @@
   </div>
 </div>
 
+<!-- Confirmación bonita -->
+<div class="fondo-oscuro" id="modalConfirm" style="display:none;">
+  <div class="modal" style="max-width:380px; text-align:center;">
+    <div id="confIco" style="font-size:48px; line-height:1;">🗑️</div>
+    <h2 id="confTit" style="justify-content:center; margin-top:10px;">¿Seguro?</h2>
+    <p id="confMsg" style="color:var(--gris); font-size:16px; margin-top:0;"></p>
+    <div class="modal-botones">
+      <button onclick="cerrar('modalConfirm')">Cancelar</button>
+      <button class="btn-rojo" id="confOk" onclick="confirmarOk()">Sí, borrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Vista 3D -->
 <div id="modal3d">
   <div class="barra3d">
@@ -468,6 +483,7 @@
     {seccion:'Mover', items:[
         {h:'seleccionar', ico:'🖱️', txt:'Seleccionar'},
         {h:'mano', ico:'✋', txt:'Mover vista'},
+        {h:'rotar', ico:'🔄', txt:'Rotar vista', fn:'rotarVista'},
       ]},
     {seccion:'Construir', items:[
         {h:'pared', ico:'🧱', txt:'Pared'},
@@ -564,7 +580,7 @@
         grupo.items.forEach(it=>{
           const b=document.createElement('button'); b.className='hbtn'; b.dataset.h=it.h;
           b.innerHTML=`<span class="ico">${it.ico}</span>${it.txt}`;
-          b.onclick=()=>elegir(it.h);
+          b.onclick = it.fn ? ()=>window[it.fn]() : ()=>elegir(it.h);
           c.appendChild(b);
         });
       }
@@ -612,8 +628,8 @@
   /* =======================================================================
      COORDENADAS / UTILIDADES
      ======================================================================= */
-  function aMundo(px,py){ return {x:(px-vista.x)/vista.escala, y:(py-vista.y)/vista.escala}; }
-  function aPantalla(x,y){ return {x:x*vista.escala+vista.x, y:y*vista.escala+vista.y}; }
+  function aPantalla(x,y){ const r=vista.rot||0; if(r){ const c=Math.cos(r),s=Math.sin(r); const rx=x*c-y*s, ry=x*s+y*c; return {x:rx*vista.escala+vista.x, y:ry*vista.escala+vista.y}; } return {x:x*vista.escala+vista.x, y:y*vista.escala+vista.y}; }
+  function aMundo(px,py){ const ix=(px-vista.x)/vista.escala, iy=(py-vista.y)/vista.escala; const r=vista.rot||0; if(r){ const c=Math.cos(-r),s=Math.sin(-r); return {x:ix*c-iy*s, y:ix*s+iy*c}; } return {x:ix, y:iy}; }
   function snap(v){ return imanRejilla ? Math.round(v/(GRID/2))*(GRID/2) : v; }
   function mPx(m){ return m/metrosPorCuadro*GRID; }
   function pxM(px){ return px/GRID*metrosPorCuadro; }
@@ -847,7 +863,7 @@
     });
   }
   function dibujarReglas(){
-    if(esMovil()) return;
+    if(esMovil() || vista.rot) return;
     const H=16, Wl=32, W=anchoCss(), Hc=altoCss(); const paso5=GRID*vista.escala*5;
     if(paso5<24) return;
     ctx.save();
@@ -959,7 +975,9 @@
     const p=aPantalla(o.x,o.y); const s=mPx(o.ancho||0.8)*vista.escala;
     const ap=(o.apertura!=null?o.apertura:90)*Math.PI/180;   // ángulo de apertura
     const sh=o.flipH?-1:1, sv=o.flipV?-1:1;                   // invertir lado / apertura
-    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((o.ang||0)*Math.PI/180); ctx.scale(sh,sv);
+    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((o.ang||0)*Math.PI/180+(vista.rot||0));
+    // invertir en su sitio: el lado (H) se refleja sobre el centro del hueco; la apertura (V) sobre la pared
+    ctx.translate(s/2,0); ctx.scale(sh,sv); ctx.translate(-s/2,0);
     // hueco (corta la pared con blanco)
     ctx.strokeStyle='#fafafa'; ctx.lineWidth=(GROSOR_PARED+2)*vista.escala; ctx.lineCap='butt';
     ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s,0); ctx.stroke();
@@ -971,7 +989,7 @@
   }
   function dibVentana(o){
     const p=aPantalla(o.x,o.y); const s=mPx(o.ancho||1.0)*vista.escala;
-    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((o.ang||0)*Math.PI/180);
+    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((o.ang||0)*Math.PI/180+(vista.rot||0));
     ctx.strokeStyle='#fafafa'; ctx.lineWidth=(GROSOR_PARED+2)*vista.escala; ctx.lineCap='butt';
     ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(s,0); ctx.stroke();
     ctx.strokeStyle='#0ea5e9'; ctx.lineWidth=3;
@@ -991,8 +1009,9 @@
   }
   function dibTexto(o){
     const p=aPantalla(o.x,o.y);
+    ctx.save(); ctx.translate(p.x,p.y); if(vista.rot) ctx.rotate(vista.rot);
     ctx.fillStyle='#0f172a'; ctx.font=`bold ${(o.tam||16)*vista.escala}px Segoe UI`;
-    ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(o.txt,p.x,p.y);
+    ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText(o.txt,0,0); ctx.restore();
   }
   function longitudCable(o){ let t=0; for(let i=0;i<o.puntos.length-1;i++) t+=pxM(Math.hypot(o.puntos[i+1].x-o.puntos[i].x, o.puntos[i+1].y-o.puntos[i].y)); return t; }
   function extremoSuelto(cab,idx){
@@ -1041,7 +1060,7 @@
   function dibSimbolo(o){
     const s=SIMBOLOS[o.clave]; if(!s) return;
     const p=aPantalla(o.x,o.y);
-    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((o.ang||0)*Math.PI/180); ctx.scale(vista.escala,vista.escala);
+    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate((o.ang||0)*Math.PI/180+(vista.rot||0)); ctx.scale(vista.escala,vista.escala);
     const w=mPx(s.m[0])*(o.escalaX||o.escala||1), h=mPx(s.m[1])*(o.escalaY||o.escala||1);
     const en = (!dibujandoFantasma && simulando && o.capa==='electrico' && simRes) ? simRes.devEn.get(o.id) : undefined;
     // halo de luz para luces encendidas
@@ -1095,12 +1114,16 @@
     ctx.stroke();
   }
   function etiquetaLinea(a,b,txt,color,off){
+    const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1;
     let mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
-    if(off){ const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1; mx+=(-dy/len)*off; my+=(dx/len)*off; }
+    if(off){ mx+=(-dy/len)*off; my+=(dx/len)*off; }           // desplazar perpendicular a la pared
+    let ang=Math.atan2(dy,dx); if(ang>Math.PI/2||ang<-Math.PI/2) ang+=Math.PI;  // texto siempre legible
+    ctx.save(); ctx.translate(mx,my); ctx.rotate(ang);
     ctx.font='bold 13px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='middle';
     const w=ctx.measureText(txt).width+10;
-    ctx.fillStyle='rgba(255,255,255,.9)'; ctx.fillRect(mx-w/2,my-10,w,20);
-    ctx.fillStyle=color; ctx.fillText(txt,mx,my);
+    ctx.fillStyle='rgba(255,255,255,.9)'; ctx.fillRect(-w/2,-10,w,20);
+    ctx.fillStyle=color; ctx.fillText(txt,0,0);
+    ctx.restore();
   }
   function conFondo(fn,x,y,size){
     // fondo blanco simple para legibilidad de medidas
@@ -1116,10 +1139,10 @@
 
   // Eléctrico (verde)
   // --- símbolos eléctricos normalizados (estilo plano profesional) ---
-  function dEnchufe(c,w,h){ const r=w/2,col='#16a34a'; c.beginPath(); c.arc(0,0,r,Math.PI,2*Math.PI); c.strokeStyle=col; c.lineWidth=2.5; c.stroke(); lin(c,-r,0,r,0,col,2.5); lin(c,0,0,0,-r,col,2.5); }
+  function dEnchufe(c,w,h){ const r=w/2,col='#16a34a'; c.beginPath(); c.arc(0,0,r,Math.PI,2*Math.PI); c.strokeStyle=col; c.lineWidth=2.5; c.stroke(); lin(c,-r,0,r,0,col,2.5); lin(c,0,0,0,-r,col,2.5); lin(c,-r*0.4,-r*0.55,r*0.4,-r*0.55,col,2); }
   function dEnchufe2(c,w,h){ const r=h/2,col='#16a34a'; lin(c,-r*1.7,0,r*1.7,0,col,2.5); [-r*0.85,r*0.85].forEach(cx=>{ c.beginPath(); c.arc(cx,0,r,Math.PI,2*Math.PI); c.strokeStyle=col; c.lineWidth=2.5; c.stroke(); lin(c,cx,0,cx,-r,col,2.5); }); }
-  function dInterruptor(c,w,h){ const r=w/2,col='#16a34a'; c.beginPath(); c.arc(0,0,r*0.42,0,7); c.fillStyle=col; c.fill(); lin(c,r*0.3,-r*0.3,r,-r,col,2.5); }
-  function dConmutador(c,w,h){ const r=w/2,col='#16a34a'; c.beginPath(); c.arc(0,0,r*0.42,0,7); c.fillStyle=col; c.fill(); lin(c,r*0.28,-r*0.28,r,-r,col,2.5); lin(c,r*0.28,-r*0.28,r,-r*0.4,col,2.5); }
+  function dInterruptor(c,w,h){ const r=w/2,col='#16a34a'; cir(c,0,0,r*0.4,col); lin(c,r*0.28,-r*0.28,r,-r,col,2.5); }
+  function dConmutador(c,w,h){ const r=w/2,col='#16a34a'; cir(c,0,0,r*0.4,col); lin(c,r*0.26,-r*0.26,r,-r,col,2.5); lin(c,r*0.26,-r*0.26,r,-r*0.45,col,2.5); }
   function dLuz(c,w,h){ const r=w/2,col='#f59e0b'; cir(c,0,0,r,col); const d=r*0.72; lin(c,-d,-d,d,d,col,2.2); lin(c,d,-d,-d,d,col,2.2); }
   function dAplique(c,w,h){ const col='#f59e0b'; const r=Math.min(w,h)*0.38; lin(c,-w/2,h*0.32,w/2,h*0.32,col,2.5); cir(c,0,0,r,col); const d=r*0.7; lin(c,-d,-d,d,d,col,2); lin(c,d,-d,-d,d,col,2); lin(c,0,r,0,h*0.32,col,2); }
   function dCuadro(c,w,h){ const col='#dc2626'; rc(c,-w/2,-h/2,w,h,col,'#fff'); c.fillStyle=col; c.beginPath(); c.moveTo(-w/2,-h/2); c.lineTo(0,-h/2); c.lineTo(0,h/2); c.lineTo(-w/2,h/2); c.closePath(); c.fill(); }
@@ -1584,6 +1607,7 @@
     } else if(o.tipo==='pared'){
       html+=propNum('Largo (m)','largoM',Math.round(pxM(Math.hypot(o.x2-o.x1,o.y2-o.y1))*100)/100);
       html+=propNum('Grosor (cm)','grosorCm',Math.round(pxM(o.grosor||GROSOR_PARED)*100));
+      html+=propSelect('Material','material',o.material||'', [['','(sin indicar)'],['ladrillo','Ladrillo'],['hormigon','Hormigón'],['pladur','Pladur / yeso'],['madera','Madera'],['piedra','Piedra'],['cristal','Cristal']]);
     } else if(o.tipo==='texto'){
       html+=propTexto('Texto','txt',o.txt);
       html+=propNum('Tamaño','tam',o.tam||16);
@@ -1694,6 +1718,7 @@
     else if(campo==='anchoSimb'){ const s=SIMBOLOS[o.clave]; o.escalaX=(num||s.m[0])/s.m[0]; }
     else if(campo==='altoSimb'){ const s=SIMBOLOS[o.clave]; o.escalaY=(num||s.m[1])/s.m[1]; }
     else if(campo==='grosorCm'){ o.grosor=mPx((num||10)/100); }
+    else if(campo==='material'){ o.material=valor; }
     else if(campo==='tipoCable'){ o.tipoCable=valor; }
     else if(campo==='ssid'){ o.ssid=valor; }
     else if(campo==='ip'){ o.ip=valor; }
@@ -1735,7 +1760,8 @@
   function duplicar(){ if(!seleccion.length) return; guardarHistorial(); const nuevos=seleccion.map(o=>{ const c=JSON.parse(JSON.stringify(o)); c.id=idNuevo(); if(c.x1!==undefined){c.x1+=GRID/2;c.x2+=GRID/2;c.y1+=GRID/2;c.y2+=GRID/2;} else if(c.x!==undefined){c.x+=GRID/2;c.y+=GRID/2;} objetos.push(c); return c; }); seleccion=nuevos; mostrarPropiedades(); redibujar(); }
   function alFrente(){ if(seleccion.length!==1) return; guardarHistorial(); const o=seleccion[0]; setObjetos(objetos.filter(x=>x!==o)); objetos.push(o); redibujar(); }
   function alFondo(){ if(seleccion.length!==1) return; guardarHistorial(); const o=seleccion[0]; setObjetos(objetos.filter(x=>x!==o)); objetos.unshift(o); redibujar(); }
-  function borrarSeleccion(){ if(!seleccion.length) return; guardarHistorial(); setObjetos(objetos.filter(o=>!seleccion.includes(o))); seleccion=[]; mostrarPropiedades(); redibujar(); }
+  function borrarSeleccion(){ if(!seleccion.length) return; const n=seleccion.length;
+    confirmarBonito('¿Borrar?', n>1?('Se eliminarán '+n+' elementos del plano.'):'Se eliminará el elemento seleccionado.', ()=>{ guardarHistorial(); setObjetos(objetos.filter(o=>!seleccion.includes(o))); seleccion=[]; mostrarPropiedades(); redibujar(); }); }
 
   /* =======================================================================
      VISTA 3D (Three.js) — levanta las paredes y apila las plantas
@@ -1875,7 +1901,8 @@
      ======================================================================= */
   function zoom(f){ zoomEnPunto(f,anchoCss()/2,altoCss()/2); }
   function zoomEnPunto(f,px,py){ const antes=aMundo(px,py); vista.escala=Math.max(0.15,Math.min(6,vista.escala*f)); const desp=aMundo(px,py); vista.x+=(desp.x-antes.x)*vista.escala; vista.y+=(desp.y-antes.y)*vista.escala; redibujar(); }
-  function centrarVista(){ vista={x:anchoCss()/2,y:altoCss()/2,escala:1}; redibujar(); }
+  function centrarVista(){ vista={x:anchoCss()/2,y:altoCss()/2,escala:1,rot:0}; redibujar(); }
+  function rotarVista(){ const W=anchoCss()/2, H=altoCss()/2; const wc=aMundo(W,H); vista.rot=((vista.rot||0)+Math.PI/2)%(2*Math.PI); const a=aPantalla(wc.x,wc.y); vista.x+=W-a.x; vista.y+=H-a.y; redibujar(); }
   function ajustarVista(){
     if(!objetos.length){ centrarVista(); return; }
     let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
@@ -1997,7 +2024,8 @@
       alert('Plano importado ✓. Pulsa 💾 Guardar si quieres conservarlo en este aparato.');
     }catch(e){ alert('El archivo no es un plano válido.'); } };
     r.readAsText(f); input.value=''; }
-  function nuevoPlano(){ if(objetos.length && !confirm('¿Empezar un plano nuevo? Guarda antes si quieres conservar el actual.')) return; plantas=[{nombre:'Planta baja', objetos:[]}]; plantaActual=0; objetos=plantas[0].objetos; seleccion=[]; nombreActual=''; actualizarNombre(); historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); centrarVista(); }
+  function nuevoPlanoReset(){ plantas=[{nombre:'Planta baja', objetos:[]}]; plantaActual=0; objetos=plantas[0].objetos; seleccion=[]; nombreActual=''; actualizarNombre(); historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); centrarVista(); }
+  function nuevoPlano(){ if(objetos.length) confirmarBonito('Empezar plano nuevo','Se borrará lo que hay en pantalla. Guarda antes si quieres conservarlo.', nuevoPlanoReset, '🆕', 'Sí, nuevo'); else nuevoPlanoReset(); }
   function actualizarNombre(){ document.getElementById('nombreActual').textContent=nombreActual?('📄 '+nombreActual):''; }
 
   /* =======================================================================
@@ -2104,6 +2132,15 @@
 
   function abrir(id){ document.getElementById(id).style.display='flex'; }
   function cerrar(id){ document.getElementById(id).style.display='none'; }
+  let _confCb=null;
+  function confirmarBonito(titulo,msg,onSi,icono,textoOk){
+    document.getElementById('confIco').textContent=icono||'🗑️';
+    document.getElementById('confTit').textContent=titulo||'¿Seguro?';
+    document.getElementById('confMsg').textContent=msg||'';
+    document.getElementById('confOk').textContent=textoOk||'Sí, borrar';
+    _confCb=onSi; abrir('modalConfirm');
+  }
+  function confirmarOk(){ cerrar('modalConfirm'); const cb=_confCb; _confCb=null; if(cb) cb(); }
   function escaparHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
   function escaparJs(s){ return (''+s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 </script>
