@@ -632,7 +632,9 @@
     }
     const edgeKey=new Map(); edges.forEach(e=>{ if(e.cab) edgeKey.set(e.cab.id+'_'+e.seg, e.energized); });
     const devEn=new Map(); clusters.forEach(c=>c.objs.forEach(o=>devEn.set(o.id,c.energized)));
-    return {edgeKey, devEn};
+    // enchufes con corriente (para saber si un electrodoméstico cercano recibe corriente)
+    const enchufesOn=[]; clusters.forEach(c=>{ if(c.energized) c.objs.forEach(o=>{ if(o.clave==='enchufe'||o.clave==='enchufe2') enchufesOn.push({x:o.x,y:o.y,piso:c.piso}); }); });
+    return {edgeKey, devEn, enchufesOn};
   }
 
   /* =======================================================================
@@ -676,8 +678,8 @@
     const subs=cl.filter(c=>c.objs.some(o=>o.clave==='subidared'));
     for(let i=0;i<subs.length;i++) for(let j=i+1;j<subs.length;j++){ if(subs[i].piso!==subs[j].piso && Math.hypot(subs[i].x-subs[j].x,subs[i].y-subs[j].y)<tol){ const e={a:subs[i],b:subs[j],cab:null,seg:-1}; subs[i].edges.push(e); subs[j].edges.push(e); } }
     const cola=[];
-    cl.forEach(c=>{ if(c.objs.some(o=>o.clave==='router')){ c.fed=true; cola.push(c); } });
-    const propaga=()=>{ while(cola.length){ const n=cola.shift(); n.edges.forEach(e=>{ const m=e.a===n?e.b:e.a; if(!m.fed){ m.fed=true; cola.push(m); } }); } };
+    cl.forEach(c=>{ const r=c.objs.find(o=>o.clave==='router'); if(r){ c.fed=true; c.router=r; cola.push(c); } });
+    const propaga=()=>{ while(cola.length){ const n=cola.shift(); n.edges.forEach(e=>{ const m=e.a===n?e.b:e.a; if(!m.fed){ m.fed=true; m.router=m.router||n.router; cola.push(m); } }); } };
     propaga();
     // --- puente por PLC (a través de la red eléctrica, también multi-planta vía subidas) ---
     const plcs=cl.flatMap(c=>c.objs.filter(o=>o.clave==='plc').map(o=>({o,dc:c})));
@@ -694,7 +696,7 @@
       const info=plcs.map(p=>({comp:compDe(p.o.x,p.o.y,p.dc.piso), dc:p.dc, fed:p.dc.fed}));
       let cambia=true;
       while(cambia){ cambia=false;
-        info.forEach(a=>{ if(a.fed && a.comp>=0){ info.forEach(b=>{ if(!b.fed && b.comp===a.comp){ b.fed=true; if(b.dc && !b.dc.fed){ b.dc.fed=true; cola.push(b.dc); } cambia=true; } }); } });
+        info.forEach(a=>{ if(a.fed && a.comp>=0){ info.forEach(b=>{ if(!b.fed && b.comp===a.comp){ b.fed=true; if(b.dc && !b.dc.fed){ b.dc.fed=true; b.dc.router=b.dc.router||a.dc.router; cola.push(b.dc); } cambia=true; } }); } });
         if(cola.length) propaga();
       }
     }
@@ -710,7 +712,17 @@
       let best=0; emisores.forEach(em=>{ if(em.piso!==c.piso) return; if(em.x===o.x&&em.y===o.y) return; const s=senalWiFi(em,o.x,o.y,walls); if(s>best) best=s; });
       sig.set(o.id,{pct:best, tipo: best>0?'wifi':'sin'});
     }));
-    return {fedDev, redEdge, emisores, sig};
+    // --- subnetting: asignar una IP a cada aparato según la subred de su router ---
+    const prefijo=ip=>{ const p=(ip||'192.168.1.1').split('.'); return (p.length>=3?p.slice(0,3).join('.'):'192.168.1')+'.'; };
+    const routers=[]; cl.forEach(c=>c.objs.forEach(o=>{ if(o.clave==='router') routers.push(o); }));
+    const ipDev=new Map(); const cnt={};
+    routers.forEach(r=>{ const pre=prefijo(r.ip); cnt[pre]=(cnt[pre]||0)+1;
+      const sub=r.subred||(pre+'0/24'); let host=10;
+      ipDev.set(r.id,{ip:r.ip||(pre+'1'),subred:sub,gateway:true});
+      cl.forEach(c=>{ if(c.fed && c.router===r) c.objs.forEach(o=>{ if(o.clave!=='router' && !ipDev.has(o.id)) ipDev.set(o.id,{ip:pre+(host++),subred:sub}); }); });
+    });
+    const prefijosDup=new Set(Object.keys(cnt).filter(k=>cnt[k]>1));
+    return {fedDev, redEdge, emisores, sig, ipDev, prefijosDup};
   }
 
   function redibujar(){
@@ -901,6 +913,15 @@
       ctx.save(); ctx.rotate(-(o.ang||0)*Math.PI/180);
       const bx=Math.max(w,h)*0.5+3, by=-Math.max(w,h)*0.5-3, rr=Math.max(4,w*0.18);
       ctx.beginPath(); ctx.arc(bx,by,rr,0,7); ctx.fillStyle=col; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle='#fff'; ctx.stroke();
+      ctx.restore();
+    }
+    // electrodomésticos: tick verde/rojo según si tienen un enchufe con corriente cerca
+    if(!dibujandoFantasma && simulando && o.capa==='muebles' && ELECTRODOMESTICOS[o.clave] && simRes){
+      const ok = electrodomesticoConCorriente(o);
+      ctx.save(); ctx.rotate(-(o.ang||0)*Math.PI/180);
+      const bx=Math.max(w,h)*0.5+3, by=-Math.max(w,h)*0.5-3, rr=Math.max(7,w*0.16);
+      ctx.beginPath(); ctx.arc(bx,by,rr,0,7); ctx.fillStyle=ok?'#22c55e':'#ef4444'; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle='#fff'; ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font='bold '+(rr*1.25)+'px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(ok?'✓':'✕',bx,by);
       ctx.restore();
     }
     ctx.restore();
@@ -1421,6 +1442,7 @@
         html+=propTexto('IP / puerta enlace','ip',o.ip||'192.168.1.1');
         html+=propTexto('Red / subred','subred',o.subred||'192.168.1.0/24');
         html+=propNum('Alcance WiFi (m)','alcance',o.alcance||12);
+        if(redRes && redRes.prefijosDup){ const pre=(o.ip||'192.168.1.1').split('.').slice(0,3).join('.')+'.'; if(redRes.prefijosDup.has(pre)) html+=`<div class="prop-fila"><label style="color:#dc2626;font-weight:700">⚠️ Otra red usa la misma subred (${pre}x). Cambia la IP para separarlas.</label></div>`; }
       }
       if(o.clave==='ap'){ html+=propNum('Alcance WiFi (m)','alcance',o.alcance||10); }
       if(o.clave==='plc'){ html+=`<div class="prop-fila"><label style="color:#94a3b8;font-size:12px">El PLC lleva la red a otra zona usando los cables eléctricos. Conéctalo al router con cable de red y pon otro PLC en el mismo circuito eléctrico.</label></div>`; }
@@ -1430,6 +1452,12 @@
         if(info){ txt = info.tipo==='router'?'📡 Fuente de internet' : info.tipo==='cable'?'🔌 Conectado por cable (100%)' : info.tipo==='wifi'?(info.pct>=15?('📶 WiFi '+info.pct+'%'):('📶 WiFi '+info.pct+'% — muy débil')) : '❌ Sin conexión'; }
         const colE = (info&&(info.tipo==='router'||info.tipo==='cable'))?'#16a34a':(info&&info.pct>=40?'#16a34a':info&&info.pct>=15?'#ea580c':'#dc2626');
         html+=`<div class="prop-fila"><label>Conexión: <b style="color:${colE}">${txt}</b></label></div>`;
+        const ipi=redRes.ipDev?redRes.ipDev.get(o.id):null;
+        if(ipi) html+=`<div class="prop-fila"><label>IP: <b>${ipi.ip}</b><br>Subred: ${ipi.subred}</label></div>`;
+      }
+      if(o.capa==='muebles' && ELECTRODOMESTICOS[o.clave]){
+        const ok=electrodomesticoConCorriente(o);
+        html+=`<div class="prop-fila"><label>Corriente: <b style="color:${ok?'#16a34a':'#dc2626'}">${ok?'✓ Tiene un enchufe con corriente cerca':'✕ Sin enchufe con corriente cerca (a menos de 1,5 m)'}</b></label></div>`;
       }
       html+=propNum('Ancho (m)','anchoSimb',Math.round(s.m[0]*(o.escalaX||o.escala||1)*100)/100);
       html+=propNum('Alto (m)','altoSimb',Math.round(s.m[1]*(o.escalaY||o.escala||1)*100)/100);
@@ -1521,6 +1549,8 @@
   let r3d={ren:null,scene:null,cam:null,anim:null,theta:Math.PI*0.85,phi:Math.PI*0.34,radius:20,target:null,drag:false,lx:0,ly:0,_ctrl:false};
   const ALT_PARED=2.5, GAP_PLANTA=0.5;
   const ALT_MUEBLE={camadoble:0.55,camaind:0.55,sofa:0.85,mesa:0.75,silla:0.95,armario:2.0,nevera:1.7,cocina:0.9,lavadora:0.85,tv:0.6};
+  const ELECTRODOMESTICOS={nevera:1,lavadora:1,cocina:1,tv:1};
+  function electrodomesticoConCorriente(o){ if(!simRes||!simRes.enchufesOn) return false; const rad=mPx(1.5); return simRes.enchufesOn.some(e=>e.piso===plantaActual && Math.hypot(e.x-o.x,e.y-o.y)<=rad); }
   const ALT_SANIT={inodoro:0.4,lavabo:0.85,bidet:0.4,ducha:0.06,banera:0.55,fregadero:0.9};
   const COL_CAPA3D={electrico:0x16a34a, datos:0x7c3aed, fontaneria:0x0ea5e9, anotacion:0xdc2626};
 
