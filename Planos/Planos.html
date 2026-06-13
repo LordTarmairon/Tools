@@ -121,6 +121,7 @@
       width:100%; font-size:15px; padding:8px; border-radius:7px; border:1px solid #475569;
       background:#0f172a; color:#fff;
     }
+    .propiedades input[type=range]{padding:0; border:none; background:transparent; accent-color:var(--azul); height:26px; cursor:pointer;}
     .prop-acciones{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
     .prop-acciones button{font-size:13px; padding:9px 6px;}
     .capa-fila{display:flex; align-items:center; gap:8px; padding:6px; border-radius:7px; background:var(--panel2);}
@@ -1441,10 +1442,10 @@
         html+=propTexto('Nombre WiFi (SSID)','ssid',o.ssid||'MiCasa');
         html+=propTexto('IP / puerta enlace','ip',o.ip||'192.168.1.1');
         html+=propTexto('Red / subred','subred',o.subred||'192.168.1.0/24');
-        html+=propNum('Alcance WiFi (m)','alcance',o.alcance||12);
+        html+=`<div class="prop-fila"><label>Alcance WiFi: <b id="lblAlc">${o.alcance||12} m</b></label><input type="range" min="2" max="25" step="1" value="${o.alcance||12}" oninput="setAlcance('${o.id}',this.value)"></div>`;
         if(redRes && redRes.prefijosDup){ const pre=(o.ip||'192.168.1.1').split('.').slice(0,3).join('.')+'.'; if(redRes.prefijosDup.has(pre)) html+=`<div class="prop-fila"><label style="color:#dc2626;font-weight:700">⚠️ Otra red usa la misma subred (${pre}x). Cambia la IP para separarlas.</label></div>`; }
       }
-      if(o.clave==='ap'){ html+=propNum('Alcance WiFi (m)','alcance',o.alcance||10); }
+      if(o.clave==='ap'){ html+=`<div class="prop-fila"><label>Alcance WiFi: <b id="lblAlc">${o.alcance||10} m</b></label><input type="range" min="2" max="25" step="1" value="${o.alcance||10}" oninput="setAlcance('${o.id}',this.value)"></div>`; }
       if(o.clave==='plc'){ html+=`<div class="prop-fila"><label style="color:#94a3b8;font-size:12px">El PLC lleva la red a otra zona usando los cables eléctricos. Conéctalo al router con cable de red y pon otro PLC en el mismo circuito eléctrico.</label></div>`; }
       if(o.capa==='datos' && redRes){
         const info=redRes.sig.get(o.id);
@@ -1485,6 +1486,7 @@
   function propSelect(lbl,campo,val,opts){ return `<div class="prop-fila"><label>${lbl}</label><select onchange="editarProp('${campo}',this.value)">${opts.map(o=>`<option value="${o[0]}" ${o[0]===val?'selected':''}>${o[1]}</option>`).join('')}</select></div>`; }
   function toggleInterruptor(id){ const o=objetos.find(x=>x.id===id); if(!o) return; guardarHistorial(); o.encendido=!(o.encendido!==false); mostrarPropiedades(); redibujar(); }
   function toggleWifi(id){ const o=objetos.find(x=>x.id===id); if(!o) return; guardarHistorial(); o.wifi=!(o.wifi!==false); mostrarPropiedades(); redibujar(); }
+  function setAlcance(id,v){ const o=objetos.find(x=>x.id===id); if(!o) return; o.alcance=parseInt(v)||10; const l=document.getElementById('lblAlc'); if(l) l.textContent=o.alcance+' m'; autoguardar(); redibujar(); }
   function alternarSim(){ simulando=!simulando; document.getElementById('tgSim').classList.toggle('on',simulando); mostrarPropiedades(); redibujar(); }
   function alternarRed(){ simRed=!simRed; document.getElementById('tgRed').classList.toggle('on',simRed); mostrarPropiedades(); redibujar(); }
 
