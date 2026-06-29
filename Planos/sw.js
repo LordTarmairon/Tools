@@ -1,6 +1,6 @@
 /* Service Worker — Dibujar Planos
    Permite instalar la app y usarla sin conexión. */
-const CACHE = 'planos-v1';
+const CACHE = 'planos-v2';
 const ARCHIVOS = [
   './',
   './Planos.html',
