@@ -2432,6 +2432,27 @@
       <tr><th colspan="2">Red / Datos</th></tr>${f('Routers',r.router)}${f('Puntos de acceso',r.ap)}${f('Switches',r.switchred)}${f('Rosetas',r.roseta)}${f('PLC',r.plc)}${f('Ordenadores',r.pc)}${f('Cable de red',fM(r.cableRed))}
       <tr><th colspan="2">Otros</th></tr>${f('Sanitarios',r.sanit)}${f('Muebles',r.muebles)}</table>`;
   }
+  /* ---- Presupuesto estimado (precios editables, se guardan) ---- */
+  const PRES_DEF={cuadros:120,enchufes:12,interruptores:12,luces:25,tomas:15,cableElecTotal:1.2,cableRed:0.8,router:40,ap:35,switchred:30,roseta:8,plc:35,puertas:90,ventanas:180,paredM:0,sanit:150,m2:0};
+  const PRES_LIN=[['cuadros','Cuadro eléctrico','ud'],['enchufes','Enchufes','ud'],['interruptores','Interruptores / conmutadores','ud'],['luces','Puntos de luz / apliques','ud'],['tomas','Tomas TV / datos','ud'],['cableElecTotal','Cable eléctrico','m'],['cableRed','Cable de red','m'],['router','Routers','ud'],['ap','Puntos de acceso','ud'],['switchred','Switches','ud'],['roseta','Rosetas','ud'],['plc','PLC','ud'],['puertas','Puertas','ud'],['ventanas','Ventanas','ud'],['paredM','Tabique / pared','m'],['sanit','Sanitarios','ud'],['m2','Superficie (obra)','m²']];
+  function preciosUsuario(){ let p={}; try{ p=JSON.parse(localStorage.getItem('planosPrecios'))||{}; }catch(e){} return Object.assign({}, PRES_DEF, p); }
+  function setPrecio(k,v){ let p={}; try{ p=JSON.parse(localStorage.getItem('planosPrecios'))||{}; }catch(e){} p[k]=parseFloat((''+v).replace(',','.'))||0; localStorage.setItem('planosPrecios',JSON.stringify(p)); recalcPres(); }
+  function cantidadPres(r,k){ if(k==='cableElecTotal') return Object.values(r.cableElec).reduce((a,b)=>a+b,0); return r[k]||0; }
+  function fEuro(n){ return (Math.round(n)).toLocaleString('es-ES')+' €'; }
+  function presupuestoHtml(soloLectura){
+    const r=resumenMateriales(), p=preciosUsuario(); let filas='', total=0;
+    PRES_LIN.forEach(([k,nom,ud])=>{ const cant=cantidadPres(r,k); if(cant<=0) return; const precio=p[k]!=null?p[k]:(PRES_DEF[k]||0); const imp=cant*precio; total+=imp;
+      const cantTxt=(ud==='ud')?cant:(ud==='m'?fM(cant):fM2(cant));
+      const precioCel=soloLectura?((''+precio).replace('.',',')+' €'):`<input type="text" inputmode="decimal" value="${(''+precio).replace('.',',')}" onchange="setPrecio('${k}',this.value)" style="width:62px;text-align:right;font-size:13px;padding:4px 6px;border:1px solid var(--borde);border-radius:6px">`;
+      filas+=`<tr><td>${nom}</td><td style="text-align:right">${cantTxt}</td><td style="text-align:right">${precioCel}</td><td style="text-align:right;font-weight:700" id="imp_${k}">${fEuro(imp)}</td></tr>`;
+    });
+    if(!filas) return '<p class="ayuda-txt">Dibuja elementos para estimar el presupuesto.</p>';
+    return `<table class="bom" style="width:100%;border-collapse:collapse"><tr><th>Concepto</th><th style="text-align:right">Cant.</th><th style="text-align:right">€/ud</th><th style="text-align:right">Importe</th></tr>${filas}<tr style="border-top:2px solid #cbd5e1"><td colspan="3" style="font-weight:700">TOTAL estimado</td><td style="text-align:right;font-weight:700;color:#1d4ed8" id="presTotal">${fEuro(total)}</td></tr></table><p class="ayuda-txt" style="margin-top:6px">Precios orientativos y editables (se guardan en este aparato). No incluye mano de obra salvo que la sumes en cada precio.</p>`;
+  }
+  function recalcPres(){ const r=resumenMateriales(), p=preciosUsuario(); let total=0;
+    PRES_LIN.forEach(([k])=>{ const cant=cantidadPres(r,k); if(cant<=0) return; const precio=p[k]!=null?p[k]:(PRES_DEF[k]||0); const imp=cant*precio; total+=imp; const el=document.getElementById('imp_'+k); if(el) el.textContent=fEuro(imp); });
+    const t=document.getElementById('presTotal'); if(t) t.textContent=fEuro(total);
+  }
   function leyendaHtml(){
     const us=new Set(); let pared=false,puerta=false,vent=false,cota=false;
     objetos.forEach(o=>{ if(o.tipo==='simbolo')us.add(o.clave); else if(o.tipo==='pared')pared=true; else if(o.tipo==='puerta')puerta=true; else if(o.tipo==='ventana')vent=true; else if(o.tipo==='cota')cota=true; });
@@ -2466,6 +2487,7 @@
   function abrirMateriales(){ document.getElementById('bomCont').innerHTML =
       '<div style="font-weight:700;color:#1d4ed8;margin:2px 0 6px">Cuadro de superficies</div>'+superficiesHtml()+
       '<div style="font-weight:700;color:#1d4ed8;margin:16px 0 6px">Materiales</div>'+bomHtml()+
+      '<div style="font-weight:700;color:#1d4ed8;margin:16px 0 6px">Presupuesto estimado</div>'+presupuestoHtml(false)+
       '<div style="font-weight:700;color:#1d4ed8;margin:16px 0 6px">Leyenda</div>'+leyendaGrid();
     abrir('modalMateriales'); }
 
@@ -2546,6 +2568,7 @@
       <div class="sec">Cuadro de superficies</div>${superficiesHtml()}
       <div class="sec">Leyenda</div>${leyendaGrid()}
       <div class="sec">Resumen de materiales</div>${bomHtml()}
+      <div class="sec">Presupuesto estimado</div>${presupuestoHtml(true)}
       <script>window.onload=()=>setTimeout(()=>window.print(),350)<\/script>
     </body></html>`);
     w.document.close();
