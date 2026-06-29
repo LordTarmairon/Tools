@@ -49,13 +49,18 @@
       transition:transform .1s, filter .15s, background .15s, box-shadow .15s;
       box-shadow:0 1px 2px rgba(0,0,0,.12);
     }
-    button:hover{background:rgba(255,255,255,.27); transform:translateY(-1px); box-shadow:0 3px 8px rgba(0,0,0,.18);}
+    /* Hover universal seguro: aclara/realza SIN reemplazar el fondo (nunca deja el botón blanco). */
+    button:hover{filter:brightness(1.08); transform:translateY(-1px); box-shadow:0 3px 8px rgba(0,0,0,.18);}
     button:active{transform:translateY(0) scale(.97); box-shadow:0 1px 2px rgba(0,0,0,.15);}
     button .bi{font-size:1.05em; line-height:1;}
-    .btn-azul{background:linear-gradient(180deg,#3b82f6,#2563eb); color:#fff;} .btn-azul:hover{filter:brightness(1.08);}
-    .btn-verde{background:linear-gradient(180deg,#1aa653,#16a34a);} .btn-verde:hover{filter:brightness(1.07);}
-    .btn-rojo{background:linear-gradient(180deg,#e23b3b,#dc2626);} .btn-rojo:hover{filter:brightness(1.07);}
-    .btn-amarillo{background:linear-gradient(180deg,#fbbf24,#f59e0b); color:#422006;} .btn-amarillo:hover{filter:brightness(1.04);}
+    .btn-azul{background:linear-gradient(180deg,#3b82f6,#2563eb); color:#fff;}
+    .btn-verde{background:linear-gradient(180deg,#1aa653,#16a34a); color:#fff;}
+    .btn-rojo{background:linear-gradient(180deg,#e23b3b,#dc2626); color:#fff;}
+    .btn-amarillo{background:linear-gradient(180deg,#fbbf24,#f59e0b); color:#422006;}
+    /* Hover con fondo visible solo en botones "lisos" (translúcidos), por contexto y con contraste garantizado */
+    header button:not([class*="btn-"]):not(.toggle):hover, .toggle:not(.on):hover{ background:rgba(255,255,255,.30); }
+    .modal button:not([class*="btn-"]):hover{ background:#d8e0ea; }
+    .prop-acciones button:not([class*="btn-"]):hover{ background:#3c4f6e; }
     .toggle{background:rgba(255,255,255,.15);}
     .toggle.on{background:#fff; color:var(--azul-osc); box-shadow:0 1px 3px rgba(0,0,0,.25);}
     .sel-medida{color:#fff; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px; white-space:nowrap;}
