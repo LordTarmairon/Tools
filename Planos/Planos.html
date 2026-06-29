@@ -262,6 +262,7 @@
     <div class="sep"></div>
     <button onclick="imprimir()" title="Imprimir el plano"><i class="bi bi-printer"></i> Imprimir</button>
   <button onclick="abrirMateriales()" title="Resumen de materiales (presupuesto)"><i class="bi bi-clipboard-data"></i> Materiales</button>
+  <button onclick="abrirCircuitos()" title="Circuitos eléctricos y esquema unifilar"><i class="bi bi-diagram-3"></i> Circuitos</button>
   <button onclick="abrirFoto()" title="Poner una foto de fondo para calcar el plano encima"><i class="bi bi-image-fill"></i> Foto</button>
     <div class="sep"></div>
     <button id="tgRejilla" class="toggle on" onclick="alternarRejilla()" title="Mostrar u ocultar la cuadrícula de fondo"><i class="bi bi-grid-3x3"></i> Rejilla</button>
@@ -401,6 +402,30 @@
     <p class="ayuda-txt" style="margin-top:0">Cuenta de todo el proyecto (todas las plantas).</p>
     <div id="bomCont"></div>
     <div class="modal-botones" style="margin-top:12px;"><button class="btn-rojo" onclick="cerrar('modalMateriales')">Cerrar</button><button class="btn-verde" onclick="imprimir()"><i class="bi bi-printer"></i> Imprimir con plano</button></div>
+  </div>
+</div>
+
+<div class="fondo-oscuro" id="modalCircuitos" style="display:none;">
+  <div class="modal" style="max-width:640px;">
+    <h2>🔌 Circuitos eléctricos</h2>
+    <p class="ayuda-txt" style="margin-top:0">Crea los circuitos de la vivienda y asigna cada enchufe/luz a uno (al seleccionarlo, en el panel derecho). El magnetotérmico y la sección de cable se calculan solos.</p>
+    <div id="circCont"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn-verde" onclick="addCircuito(16);renderCircuitos()"><i class="bi bi-plus-lg"></i> Añadir circuito</button>
+      <button class="btn-azul" onclick="seedCircuitos()">Circuitos típicos</button>
+      <button onclick="abrirUnifilar()"><i class="bi bi-diagram-3"></i> Ver esquema unifilar</button>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;cursor:pointer"><input type="checkbox" id="chkVerCirc" style="width:auto;transform:scale(1.2)" onchange="verCircuitos=this.checked;redibujar()"> Ver los colores de circuito sobre el plano</label>
+    <div class="modal-botones" style="margin-top:12px;"><button class="btn-rojo" onclick="cerrar('modalCircuitos')">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="fondo-oscuro" id="modalUnifilar" style="display:none;">
+  <div class="modal" style="max-width:920px;">
+    <h2>📐 Esquema unifilar</h2>
+    <p class="ayuda-txt" style="margin-top:0">Cuadro general de mando y protección con todos los circuitos, su magnetotérmico y la sección de cable.</p>
+    <div id="uniCont" style="overflow:auto;border:1px solid var(--borde);border-radius:10px;padding:8px;background:#fff"></div>
+    <div class="modal-botones" style="margin-top:12px;"><button class="btn-rojo" onclick="cerrar('modalUnifilar')">Cerrar</button><button class="btn-verde" onclick="imprimirUnifilar()"><i class="bi bi-printer"></i> Imprimir</button></div>
   </div>
 </div>
 
@@ -588,6 +613,9 @@
   let simboloActivo = null;
   let GRID = 50;                 // px de mundo por cuadrado
   let metrosPorCuadro = 0.5;
+  let circuitos = [];            // circuitos eléctricos del plano: {id,nombre,amp,color}
+  let verCircuitos = false;      // mostrar el color/nº de circuito sobre cada aparato
+  const COL_CIRC = ['#2563eb','#16a34a','#dc2626','#f59e0b','#7c3aed','#0ea5e9','#db2777','#65a30d','#ea580c','#0891b2','#9333ea','#ca8a04','#e11d48','#15803d','#4f46e5'];
   let GROSOR_PARED = 12;         // px de mundo
   let vista = {x:0,y:0,escala:1};
   let imanRejilla = true, ortho = true, verRejilla = true;
@@ -1155,6 +1183,16 @@
     }
     ctx.lineJoin='round'; ctx.lineCap='round';
     s.dib(ctx,w,h,o);
+    // distintivo de circuito (color + nº) cuando está activado "ver circuitos"
+    if(verCircuitos && !dibujandoFantasma && o.capa==='electrico' && o.circuito){
+      const cc=colorCircuito(o.circuito);
+      if(cc){ ctx.save(); ctx.rotate(-(o.ang||0)*Math.PI/180);
+        const bx=-Math.max(w,h)*0.5-3, by=-Math.max(w,h)*0.5-3, rr=Math.max(7,w*0.2);
+        ctx.beginPath(); ctx.arc(bx,by,rr,0,7); ctx.fillStyle=cc; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle='#fff'; ctx.stroke();
+        ctx.fillStyle='#fff'; ctx.font='bold '+(rr*1.05)+'px Inter, Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(String(o.circuito).replace(/[^0-9]/g,''), bx, by); ctx.restore();
+      }
+    }
     // indicador de estado eléctrico
     if(!dibujandoFantasma && simulando && o.capa==='electrico' && simRes){
       ctx.save(); ctx.rotate(-(o.ang||0)*Math.PI/180);
@@ -1800,6 +1838,9 @@
         html+=propCheck('Estanco (exterior/baño)','estanca',!!o.estanca);
         html+=propNum('Consumo (W)','vatios',o.vatios||0);
       }
+      if(o.capa==='electrico' && o.clave!=='cuadro' && o.clave!=='subida'){
+        html+=propSelect('Circuito','circuito',o.circuito||'', [['','(sin circuito)']].concat(circuitos.map(c=>[c.id, c.id+' · '+c.nombre])));
+      }
       if(o.capa==='electrico' && simRes){
         const en=simRes.devEn.get(o.id);
         html+=`<div class="prop-fila"><label>Estado: <b style="color:${en?'#16a34a':'#94a3b8'}">${en?'⚡ Con corriente':'⭘ Sin corriente'}</b></label></div>`;
@@ -1893,6 +1934,7 @@
     else if(campo==='voltaje'){ o.voltaje=num||230; }
     else if(campo==='amperaje'){ o.amperaje=num||25; }
     else if(campo==='estanca'){ o.estanca=(valor===true||valor==='true'); }
+    else if(campo==='circuito'){ o.circuito=valor; }
     else if(campo==='vatios'){ o.vatios=isNaN(num)?0:num; }
     else if(campo==='anchoM'){ const x=Math.min(o.x1,o.x2); o.x1=x; o.x2=x+mPx(num); }
     else if(campo==='altoM'){ const y=Math.min(o.y1,o.y2); o.y1=y; o.y2=y+mPx(num); }
@@ -2113,7 +2155,7 @@
   let nombreActual='';
   function planos(){ try{return JSON.parse(localStorage.getItem(CLAVE))||{};}catch(e){return {};} }
   function setPlanos(p){ localStorage.setItem(CLAVE,JSON.stringify(p)); }
-  function autoguardar(){ try{ localStorage.setItem('planoBorrador',JSON.stringify({plantas:plantas.map(p=>({nombre:p.nombre,objetos:p.objetos,fondo:p.fondo})), plantaActual, metrosPorCuadro})); }catch(e){} }
+  function autoguardar(){ try{ localStorage.setItem('planoBorrador',JSON.stringify({plantas:plantas.map(p=>({nombre:p.nombre,objetos:p.objetos,fondo:p.fondo})), plantaActual, metrosPorCuadro, circuitos})); }catch(e){} }
 
   /* ---- gestión de plantas ---- */
   function cambiarPlanta(i){ if(i<0||i>=plantas.length) return; plantaActual=i; objetos=plantas[i].objetos; historial.length=0; rehacer.length=0; seleccion=[]; actualizarPlantas(); mostrarPropiedades(); redibujar(); }
@@ -2133,7 +2175,7 @@
     const nombre=document.getElementById('nombrePlano').value.trim();
     if(!nombre){ alert('Ponle un nombre al plano.'); return; }
     const todos=planos();
-    todos[nombre]={plantas:plantas.map(p=>({nombre:p.nombre, objetos:p.objetos, fondo:p.fondo})), metrosPorCuadro, fecha:Date.now(), miniatura:generarMiniatura()};
+    todos[nombre]={plantas:plantas.map(p=>({nombre:p.nombre, objetos:p.objetos, fondo:p.fondo})), metrosPorCuadro, circuitos, fecha:Date.now(), miniatura:generarMiniatura()};
     setPlanos(todos); nombreActual=nombre; actualizarNombre(); cerrar('modalGuardar');
   }
   function generarMiniatura(){
@@ -2175,10 +2217,11 @@
     else { plantas=[{nombre:'Planta baja', objetos:p.objetos||[]}]; }   // compatibilidad con planos antiguos
     plantaActual=0; objetos=plantas[0].objetos;
     metrosPorCuadro=p.metrosPorCuadro||0.5; document.getElementById('selEscala').value=metrosPorCuadro;
+    circuitos=p.circuitos||[];
     nombreActual=n; actualizarNombre(); seleccion=[]; historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); ajustarVista(); } cerrar('modalCargar'); }
   function borrarPlano(n){ if(confirm('¿Borrar el plano "'+n+'"?')){ const t=planos(); delete t[n]; setPlanos(t); abrirCargar(); } }
   function descargarPlano(){
-    const datos={tipo:'plano-padre', version:1, nombre:nombreActual||'plano', metrosPorCuadro, plantas:plantas.map(p=>({nombre:p.nombre,objetos:p.objetos,fondo:p.fondo}))};
+    const datos={tipo:'plano-padre', version:1, nombre:nombreActual||'plano', metrosPorCuadro, circuitos, plantas:plantas.map(p=>({nombre:p.nombre,objetos:p.objetos,fondo:p.fondo}))};
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(datos)],{type:'application/json'}));
     a.download=(nombreActual||'plano').replace(/[^\w\- ]/g,'')+'.plano.json'; a.click();
   }
@@ -2186,11 +2229,12 @@
     r.onload=()=>{ try{ const d=JSON.parse(r.result); const pl=(d.plantas&&d.plantas.length)?d.plantas:(d.objetos?[{nombre:'Planta',objetos:d.objetos}]:null); if(!pl) throw 0;
       plantas=pl.map(p=>({nombre:p.nombre||'Planta', objetos:p.objetos||[], fondo:p.fondo||null})); plantaActual=0; objetos=plantas[0].objetos;
       metrosPorCuadro=d.metrosPorCuadro||0.5; document.getElementById('selEscala').value=metrosPorCuadro;
+      circuitos=d.circuitos||[];
       nombreActual=(d.nombre||'')+''; actualizarNombre(); seleccion=[]; historial.length=0; rehacer.length=0; _imgFondo=null; actualizarPlantas(); mostrarPropiedades(); ajustarVista();
       alert('Plano importado ✓. Pulsa 💾 Guardar si quieres conservarlo en este aparato.');
     }catch(e){ alert('El archivo no es un plano válido.'); } };
     r.readAsText(f); input.value=''; }
-  function nuevoPlanoReset(){ plantas=[{nombre:'Planta baja', objetos:[]}]; plantaActual=0; objetos=plantas[0].objetos; seleccion=[]; nombreActual=''; actualizarNombre(); historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); centrarVista(); }
+  function nuevoPlanoReset(){ plantas=[{nombre:'Planta baja', objetos:[]}]; plantaActual=0; objetos=plantas[0].objetos; seleccion=[]; circuitos=[]; nombreActual=''; actualizarNombre(); historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); centrarVista(); }
   function nuevoPlano(){ if(objetos.length) confirmarBonito('Empezar plano nuevo','Se borrará lo que hay en pantalla. Guarda antes si quieres conservarlo.', nuevoPlanoReset, '🆕', 'Sí, nuevo'); else nuevoPlanoReset(); }
   function actualizarNombre(){ document.getElementById('nombreActual').textContent=nombreActual?('📄 '+nombreActual):''; }
 
@@ -2236,6 +2280,71 @@
     return it.map(t=>`<span style="display:inline-block;margin:2px 12px 2px 0">${t}</span>`).join('')||'(sin elementos)';
   }
   function abrirMateriales(){ document.getElementById('bomCont').innerHTML=bomHtml(); abrir('modalMateriales'); }
+
+  /* =======================================================================
+     CIRCUITOS ELÉCTRICOS + ESQUEMA UNIFILAR
+     ======================================================================= */
+  const TIPOS_CIRC=[ {amp:10,s:'1,5 mm²'},{amp:16,s:'2,5 mm²'},{amp:20,s:'4 mm²'},{amp:25,s:'6 mm²'},{amp:32,s:'10 mm²'} ];
+  function seccionCable(amp){ const t=TIPOS_CIRC.find(x=>x.amp==amp); return t?t.s:'—'; }
+  function circuitoDe(id){ return circuitos.find(c=>c.id===id); }
+  function colorCircuito(id){ const c=circuitoDe(id); return c?c.color:null; }
+  function nuevoIdCirc(){ let n=1; while(circuitos.some(c=>c.id==='C'+String(n).padStart(2,'0'))) n++; return 'C'+String(n).padStart(2,'0'); }
+  function addCircuito(amp,nombre){ const id=nuevoIdCirc(); circuitos.push({id, nombre:nombre||('Circuito '+id), amp:amp||16, color:COL_CIRC[circuitos.length%COL_CIRC.length]}); autoguardar(); }
+  function seedCircuitos(){
+    const poner=()=>{ [[10,'Alumbrado'],[16,'Tomas de uso general'],[16,'Baños y cocina'],[20,'Lavadora/lavavajillas/termo'],[25,'Cocina y horno']].forEach(([a,n])=>addCircuito(a,n)); renderCircuitos(); redibujar(); };
+    if(circuitos.length) confirmarBonito('Circuitos típicos','Se añadirán los circuitos habituales de una vivienda a los que ya tienes.', poner, '🔌', 'Añadir'); else poner();
+  }
+  function statsCircuito(id){ let w=0,n=0; const def={luz:60,aplique:60,luzpared:40,focoled:30,tiraled:30};
+    plantas.forEach(pl=>pl.objetos.forEach(o=>{ if(o.tipo==='simbolo'&&o.capa==='electrico'&&o.circuito===id){ n++; w+=(o.vatios!=null&&o.vatios!=='')?(+o.vatios||0):(def[o.clave]||0); } }));
+    return {w,n}; }
+  function elementosSinCircuito(){ let n=0; const asignables=['enchufe','enchufe2','luz','aplique','luzpared','focoled','tiraled','tvtoma','timbre','pulsador','persianas'];
+    plantas.forEach(pl=>pl.objetos.forEach(o=>{ if(o.tipo==='simbolo'&&o.capa==='electrico'&&asignables.includes(o.clave)&&!o.circuito) n++; })); return n; }
+  function abrirCircuitos(){ renderCircuitos(); const ch=document.getElementById('chkVerCirc'); if(ch) ch.checked=verCircuitos; abrir('modalCircuitos'); }
+  function renderCircuitos(){
+    const cont=document.getElementById('circCont'); if(!cont) return;
+    let html='';
+    if(!circuitos.length){ html='<p class="ayuda-txt">Aún no hay circuitos. Crea los típicos de una vivienda o añádelos uno a uno.</p>'; }
+    else{
+      html+='<table class="bom" style="width:100%;border-collapse:collapse"><tr><th></th><th>Circuito</th><th>Magnet.</th><th>Cable</th><th>Elem.</th><th>Potencia</th><th></th></tr>';
+      circuitos.forEach((c,i)=>{ const st=statsCircuito(c.id); const sobre=st.w>c.amp*230;
+        html+=`<tr><td><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${c.color}"></span></td>`+
+          `<td><b>${c.id}</b> <input value="${escaparHtml(c.nombre)}" onchange="editCirc(${i},'nombre',this.value)" style="width:130px;font-size:13px;padding:4px 6px;border:1px solid var(--borde);border-radius:6px"></td>`+
+          `<td><select onchange="editCirc(${i},'amp',this.value)" style="font-size:13px;padding:4px">${TIPOS_CIRC.map(t=>`<option value="${t.amp}" ${t.amp==c.amp?'selected':''}>${t.amp} A</option>`).join('')}</select></td>`+
+          `<td>${seccionCable(c.amp)}</td><td style="text-align:center">${st.n}</td>`+
+          `<td style="${sobre?'color:#dc2626;font-weight:700':''}">${st.w} W${sobre?' ⚠️':''}</td>`+
+          `<td><button class="btn-rojo" style="padding:5px 9px;font-size:12px" onclick="delCirc(${i})">🗑️</button></td></tr>`;
+      });
+      html+='</table>';
+      const sinc=elementosSinCircuito(); if(sinc) html+=`<p style="color:#b45309;font-size:13px;margin:8px 0 0">⚠️ Hay ${sinc} aparato(s) eléctrico(s) sin circuito asignado.</p>`;
+    }
+    cont.innerHTML=html;
+  }
+  function editCirc(i,campo,val){ const c=circuitos[i]; if(!c) return; if(campo==='amp') c.amp=+val; else c[campo]=val; autoguardar(); renderCircuitos(); redibujar(); }
+  function delCirc(i){ const c=circuitos[i]; if(!c) return; confirmarBonito('Borrar circuito','Se quitará el circuito '+c.id+'. Los aparatos quedarán sin circuito.', ()=>{ plantas.forEach(pl=>pl.objetos.forEach(o=>{ if(o.circuito===c.id) o.circuito=''; })); circuitos.splice(i,1); autoguardar(); renderCircuitos(); redibujar(); }, '🗑️', 'Sí, borrar'); }
+  function abrirUnifilar(){ document.getElementById('uniCont').innerHTML=unifilarSVG(); abrir('modalUnifilar'); }
+  function unifilarSVG(){
+    const cs=circuitos, step=124, x0=70, W=Math.max(760, x0*2+Math.max(1,cs.length)*step), H=490, cx=W/2, ink='#0f172a';
+    const box=(x,y,w,h,txt,col)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="#fff" stroke="${col||ink}" stroke-width="2"/><text x="${x+w/2}" y="${y+h/2+1}" text-anchor="middle" dominant-baseline="middle" font-size="12" font-weight="600" fill="${col||ink}">${txt}</text>`;
+    const line=(x1,y1,x2,y2)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${ink}" stroke-width="2"/>`;
+    let s=`<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Inter, Segoe UI, sans-serif">`;
+    s+=`<text x="${cx}" y="16" text-anchor="middle" font-size="12" fill="${ink}">Acometida / Red</text>`;
+    s+=line(cx,22,cx,40)+box(cx-36,40,72,26,'IGA 40 A')+line(cx,66,cx,82)+box(cx-50,82,100,26,'ID 40 A · 30 mA')+line(cx,108,cx,140);
+    s+=line(x0,140,W-x0,140);
+    if(!cs.length){ s+=`<text x="${cx}" y="200" text-anchor="middle" font-size="14" fill="#94a3b8">No hay circuitos todavía.</text>`; }
+    cs.forEach((c,i)=>{ const x=x0+step/2+i*step; const st=statsCircuito(c.id);
+      s+=line(x,140,x,164)+box(x-19,164,38,26,c.id,c.color)+line(x,190,x,214);
+      s+=`<circle cx="${x}" cy="226" r="6" fill="${c.color}"/>`;
+      s+=`<text x="${x}" y="252" text-anchor="middle" font-size="12" font-weight="600" fill="${ink}">${c.amp} A · ${seccionCable(c.amp)}</text>`;
+      s+=`<text x="${x}" y="268" text-anchor="middle" font-size="11" fill="#475569">${st.n} elem · ${st.w} W</text>`;
+      s+=`<text transform="translate(${x+4},286) rotate(60)" font-size="12" fill="${ink}">${escaparHtml(c.nombre)}</text>`;
+    });
+    s+='</svg>'; return s;
+  }
+  function imprimirUnifilar(){ const fecha=new Date().toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'});
+    const w=window.open(''); w.document.write(`<html><head><title>Esquema unifilar</title></head><body style="font-family:Inter,Segoe UI,Arial;margin:18px">`+
+      `<h1 style="font-size:20px;margin:0">Esquema unifilar — ${escaparHtml(nombreActual||'Plano')}</h1>`+
+      `<div style="color:#475569;font-size:13px;margin:4px 0 12px">Fecha: ${fecha}</div>${unifilarSVG()}`+
+      `<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`); w.document.close(); }
   function imprimir(){
     const data=renderExport(2);
     const fecha=new Date().toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'});
@@ -2291,7 +2400,7 @@
   try{ const b=JSON.parse(localStorage.getItem('planoBorrador')); if(b){
     if(b.plantas && b.plantas.length){ plantas=b.plantas.map(p=>({nombre:p.nombre, objetos:p.objetos||[], fondo:p.fondo||null})); plantaActual=Math.min(b.plantaActual||0, plantas.length-1); objetos=plantas[plantaActual].objetos; }
     else if(b.objetos && b.objetos.length){ plantas=[{nombre:'Planta baja', objetos:b.objetos}]; plantaActual=0; objetos=plantas[0].objetos; }
-    metrosPorCuadro=b.metrosPorCuadro||0.5; document.getElementById('selEscala').value=metrosPorCuadro; ajustarVista();
+    metrosPorCuadro=b.metrosPorCuadro||0.5; document.getElementById('selEscala').value=metrosPorCuadro; circuitos=b.circuitos||[]; ajustarVista();
   } }catch(e){}
   actualizarPlantas();
   aplicarLayout();
