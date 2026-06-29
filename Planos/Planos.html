@@ -398,8 +398,8 @@
 <!-- Materiales -->
 <div class="fondo-oscuro" id="modalMateriales" style="display:none;">
   <div class="modal" style="max-width:480px;">
-    <h2>📋 Resumen de materiales</h2>
-    <p class="ayuda-txt" style="margin-top:0">Cuenta de todo el proyecto (todas las plantas).</p>
+    <h2>📋 Resumen del proyecto</h2>
+    <p class="ayuda-txt" style="margin-top:0">Superficies, materiales y leyenda de todo el proyecto (todas las plantas).</p>
     <div id="bomCont"></div>
     <div class="modal-botones" style="margin-top:12px;"><button class="btn-rojo" onclick="cerrar('modalMateriales')">Cerrar</button><button class="btn-verde" onclick="imprimir()"><i class="bi bi-printer"></i> Imprimir con plano</button></div>
   </div>
@@ -2279,7 +2279,35 @@
     [...us].forEach(k=>{ if(SIMBOLOS[k]) it.push((ICONOS_SIMB[k]||'▫️')+' '+SIMBOLOS[k].nombre); });
     return it.map(t=>`<span style="display:inline-block;margin:2px 12px 2px 0">${t}</span>`).join('')||'(sin elementos)';
   }
-  function abrirMateriales(){ document.getElementById('bomCont').innerHTML=bomHtml(); abrir('modalMateriales'); }
+  // mini dibujo real de un símbolo (para la leyenda), devuelve dataURL
+  function miniSimbolo(clave){ const s=SIMBOLOS[clave]; if(!s) return ''; const cv=document.createElement('canvas'); cv.width=cv.height=38;
+    const g=cv.getContext('2d'); g.translate(19,19); g.lineJoin='round'; g.lineCap='round'; try{ s.dib(g,26,26,{amperaje:16}); }catch(e){} return cv.toDataURL(); }
+  // leyenda con los dibujos reales de los símbolos usados (estilo lámina)
+  function leyendaGrid(){
+    const us=[], seen=new Set(); let pared=false,puerta=false,vent=false,cota=false;
+    plantas.forEach(pl=>pl.objetos.forEach(o=>{ if(o.tipo==='simbolo'){ if(!seen.has(o.clave)){seen.add(o.clave); us.push(o.clave);} } else if(o.tipo==='pared')pared=true; else if(o.tipo==='puerta')puerta=true; else if(o.tipo==='ventana')vent=true; else if(o.tipo==='cota')cota=true; }));
+    const row=(img,nom)=>`<div style="display:flex;align-items:center;gap:8px;width:172px;margin:2px 0"><span style="width:34px;height:34px;flex:0 0 34px;display:flex;align-items:center;justify-content:center;font-size:20px">${img}</span><span style="font-size:13px">${escaparHtml(nom)}</span></div>`;
+    let cells='';
+    if(pared) cells+=row('<svg width="30" height="30"><line x1="3" y1="15" x2="27" y2="15" stroke="#1e293b" stroke-width="5" stroke-linecap="round"/></svg>','Pared');
+    if(puerta) cells+=row('🚪','Puerta'); if(vent) cells+=row('🪟','Ventana'); if(cota) cells+=row('📏','Medida');
+    us.forEach(k=>{ if(SIMBOLOS[k]) cells+=row(`<img src="${miniSimbolo(k)}" width="34" height="34" alt="">`, SIMBOLOS[k].nombre); });
+    return `<div style="display:flex;flex-wrap:wrap;gap:2px 14px">${cells||'(sin elementos)'}</div>`;
+  }
+  // cuadro de superficies: m² por estancia (habitaciones de todas las plantas) + total
+  function superficiesHtml(){
+    let rows='', total=0;
+    plantas.forEach(pl=>pl.objetos.filter(o=>o.tipo==='habitacion').forEach(h=>{
+      const a=pxM(Math.abs(h.x2-h.x1))*pxM(Math.abs(h.y2-h.y1)); total+=a;
+      rows+=`<tr><td>${plantas.length>1?escaparHtml(pl.nombre)+' · ':''}${escaparHtml(h.nombre||'(sin nombre)')}</td><td style="text-align:right;font-weight:700">${fM2(a)}</td></tr>`;
+    }));
+    if(!rows) return '<p class="ayuda-txt">No hay habitaciones con superficie. Dibuja "Habitación" o cierra recintos con paredes (verás los m² en el plano).</p>';
+    return `<table class="bom" style="width:100%;border-collapse:collapse"><tr><th>Estancia</th><th style="text-align:right">Superficie</th></tr>${rows}<tr style="border-top:2px solid #cbd5e1"><td style="font-weight:700">TOTAL construido</td><td style="text-align:right;font-weight:700">${fM2(total)}</td></tr></table>`;
+  }
+  function abrirMateriales(){ document.getElementById('bomCont').innerHTML =
+      '<div style="font-weight:700;color:#1d4ed8;margin:2px 0 6px">Cuadro de superficies</div>'+superficiesHtml()+
+      '<div style="font-weight:700;color:#1d4ed8;margin:16px 0 6px">Materiales</div>'+bomHtml()+
+      '<div style="font-weight:700;color:#1d4ed8;margin:16px 0 6px">Leyenda</div>'+leyendaGrid();
+    abrir('modalMateriales'); }
 
   /* =======================================================================
      CIRCUITOS ELÉCTRICOS + ESQUEMA UNIFILAR
@@ -2355,7 +2383,8 @@
       <div class="cajetin"><div><h1>${escaparHtml(nombreActual||'Plano sin nombre')}</h1><div style="font-size:13px;color:#334155">Plano de vivienda</div></div>
         <div class="meta">Fecha: ${fecha}<br>Escala: 1 cuadro = ${fM(metrosPorCuadro)}<br>Plantas: ${plantas.length}</div></div>
       <img src="${data}">
-      <div class="sec">Leyenda</div><div class="ley">${leyendaHtml()}</div>
+      <div class="sec">Cuadro de superficies</div>${superficiesHtml()}
+      <div class="sec">Leyenda</div>${leyendaGrid()}
       <div class="sec">Resumen de materiales</div>${bomHtml()}
       <script>window.onload=()=>setTimeout(()=>window.print(),350)<\/script>
     </body></html>`);
