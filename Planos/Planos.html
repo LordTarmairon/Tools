@@ -87,6 +87,19 @@
     .seccion-tit .flecha{transition:.2s;}
     .seccion.cerrada .flecha{transform:rotate(-90deg);}
     .seccion.cerrada .contenido-seccion{display:none;}
+    .seccion-tit .cdot{width:9px; height:9px; border-radius:3px; display:inline-block; margin-right:6px; vertical-align:-1px;}
+    .contenido-seccion{display:flex; flex-direction:column; gap:4px;}
+    /* buscador del catálogo */
+    .buscar-herr{display:flex; align-items:center; gap:7px; background:#0e1828; border:1px solid rgba(255,255,255,.10); border-radius:9px; padding:7px 9px; margin-bottom:6px; color:#8aa0bf;}
+    .buscar-herr input{flex:1; background:transparent; border:none; outline:none; color:#e2e8f0; font-family:inherit; font-size:13px; padding:0;}
+    .buscar-herr input::placeholder{color:#7e8ca6;}
+    /* catálogo de símbolos en cuadrícula con dibujo real */
+    .herramientas .tiles{display:grid; grid-template-columns:1fr 1fr; gap:5px;}
+    .herramientas .tile{display:flex; flex-direction:column; align-items:center; gap:3px; padding:7px 3px; background:#2f3e57; border:1px solid rgba(255,255,255,.05); border-radius:9px; cursor:pointer; font-size:11px; color:#cbd5e1; text-align:center; line-height:1.15; font-family:inherit;}
+    .herramientas .tile:hover{background:#3c4f6e;}
+    .herramientas .tile.activa{background:linear-gradient(180deg,#3b82f6,#2563eb); border-color:rgba(255,255,255,.35); color:#fff;}
+    .herramientas .tile img{width:30px; height:30px; display:block; pointer-events:none;}
+    .herramientas.buscando .seccion.cerrada .contenido-seccion{display:flex;}
     /* la sección "Mover" se queda fija arriba aunque hagas scroll */
     .herramientas .seccion-fija{
       position:sticky; top:-8px; z-index:6; background:var(--panel);
@@ -662,34 +675,52 @@
   function construirHerramientas(){
     const cont = document.getElementById('herramientas');
     cont.innerHTML='';
+    const bw=document.createElement('div'); bw.className='buscar-herr';
+    bw.innerHTML=`<i class="bi bi-search"></i><input type="search" placeholder="Buscar elemento…" oninput="filtrarHerr(this.value)" aria-label="Buscar elemento">`;
+    cont.appendChild(bw);
     HERRAMIENTAS.forEach((grupo,gi)=>{
       const sec = document.createElement('div'); sec.className='seccion';
       if(gi===0) sec.classList.add('seccion-fija');   // "Mover" siempre visible
       const tit = document.createElement('div'); tit.className='seccion-tit';
-      tit.innerHTML = `<span>${grupo.seccion}</span><span class="flecha">▾</span>`;
+      const col = grupo.cat && CAPAS[grupo.cat] ? CAPAS[grupo.cat].color : null;
+      tit.innerHTML = `<span>${col?`<span class="cdot" style="background:${col}"></span>`:''}${grupo.seccion}</span><span class="flecha">▾</span>`;
       tit.onclick = ()=>sec.classList.toggle('cerrada');
       sec.appendChild(tit);
-      const c = document.createElement('div'); c.className='contenido-seccion'; c.style.display='flex'; c.style.flexDirection='column'; c.style.gap='3px';
+      const c = document.createElement('div'); c.className='contenido-seccion';
       if(grupo.items){
         grupo.items.forEach(it=>{
-          const b=document.createElement('button'); b.className='hbtn'; b.dataset.h=it.h;
+          const b=document.createElement('button'); b.className='hbtn'; b.dataset.h=it.h; b.dataset.nombre=it.txt.toLowerCase();
           b.innerHTML=`<span class="ico">${it.ico}</span>${it.txt}`;
           b.onclick = it.fn ? ()=>window[it.fn]() : ()=>elegir(it.h);
           c.appendChild(b);
         });
       }
       if(grupo.cat){
+        const g=document.createElement('div'); g.className='tiles';
         Object.keys(SIMBOLOS).filter(k=>SIMBOLOS[k].cat===grupo.cat).forEach(k=>{
           const s=SIMBOLOS[k];
-          const b=document.createElement('button'); b.className='hbtn'; b.dataset.simbolo=k;
-          b.innerHTML=`<span class="ico">${ICONOS_SIMB[k]||'▫️'}</span>${s.nombre}`;
+          const b=document.createElement('button'); b.className='tile'; b.dataset.simbolo=k; b.dataset.nombre=s.nombre.toLowerCase();
+          b.innerHTML=`<img src="${miniSimbolo(k)}" alt=""><span>${s.nombre}</span>`;
           b.onclick=()=>elegirSimbolo(k);
-          c.appendChild(b);
+          g.appendChild(b);
         });
+        c.appendChild(g);
       }
       sec.appendChild(c);
       cont.appendChild(sec);
     });
+  }
+  function filtrarHerr(q){ q=(q||'').trim().toLowerCase();
+    const cont=document.getElementById('herramientas'); cont.classList.toggle('buscando', !!q);
+    cont.querySelectorAll('.seccion').forEach(sec=>{
+      const items=sec.querySelectorAll('[data-nombre]'); if(!items.length){ sec.style.display=q?'none':''; return; }
+      let any=false; items.forEach(el=>{ const m=!q||el.dataset.nombre.includes(q); el.style.display=m?'':'none'; if(m) any=true; });
+      sec.style.display=any?'':'none';
+    });
+  }
+  function marcarActiva(){
+    document.querySelectorAll('#herramientas [data-h]').forEach(b=>b.classList.toggle('activa', herramienta!=='simbolo' && b.dataset.h===herramienta));
+    document.querySelectorAll('#herramientas [data-simbolo]').forEach(b=>b.classList.toggle('activa', herramienta==='simbolo' && b.dataset.simbolo===simboloActivo));
   }
 
   function construirCapas(){
@@ -1731,7 +1762,7 @@
      ======================================================================= */
   function elegir(h){
     herramienta=h; simboloActivo=null; terminarCable();
-    document.querySelectorAll('.hbtn').forEach(b=>b.classList.toggle('activa', b.dataset.h===h));
+    marcarActiva();
     const ay=document.getElementById('ayuda'); ay.textContent=AYUDAS[h]||''; ay.style.display='';
     lienzo.style.cursor = h==='mano'?'grab':(h==='seleccionar'?'default':'crosshair');
     if(h!=='seleccionar'){ seleccion=[]; mostrarPropiedades(); }
@@ -1753,7 +1784,7 @@
   }
   function elegirSimbolo(k){
     herramienta='simbolo'; simboloActivo=k; terminarCable();
-    document.querySelectorAll('.hbtn').forEach(b=>b.classList.toggle('activa', b.dataset.simbolo===k));
+    marcarActiva();
     const ay=document.getElementById('ayuda'); ay.textContent='Colocar: '+SIMBOLOS[k].nombre+'. '+AYUDAS.simbolo; ay.style.display='';
     lienzo.style.cursor='crosshair'; seleccion=[]; mostrarPropiedades();
     if(esMovil()) cerrarDrawers();
