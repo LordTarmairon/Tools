@@ -475,6 +475,12 @@
     cuadro:       {nombre:'Cuadro eléct.',  capa:'electrico', cat:'electrico', m:[0.6,0.4],   dib:dCuadro},
     tvtoma:       {nombre:'Toma TV',        capa:'electrico', cat:'electrico', m:[0.35,0.35], dib:dTomaTV},
     redtoma:      {nombre:'Toma datos',     capa:'electrico', cat:'electrico', m:[0.35,0.35], dib:dTomaRed},
+    intdoble:     {nombre:'Interruptor doble', capa:'electrico', cat:'electrico', m:[0.4,0.35], dib:dIntDoble},
+    luzpared:     {nombre:'Luz pared',      capa:'electrico', cat:'electrico', m:[0.4,0.4],   dib:dLuzPared},
+    focoled:      {nombre:'Foco LED ext.',  capa:'electrico', cat:'electrico', m:[0.35,0.45], dib:dFocoLed},
+    tiraled:      {nombre:'Tira LED',       capa:'electrico', cat:'electrico', m:[0.9,0.12],  dib:dTiraLed},
+    timbre:       {nombre:'Timbre',         capa:'electrico', cat:'electrico', m:[0.45,0.35], dib:dTimbre},
+    persianas:    {nombre:'Int. persianas', capa:'electrico', cat:'electrico', m:[0.4,0.35],  dib:dPersianas},
     subida:       {nombre:'Subida (planta)',capa:'electrico', cat:'electrico', m:[0.32,0.32], dib:dSubida},
     // --- Fontanería ---
     inodoro:      {nombre:'Inodoro',        capa:'fontaneria', cat:'fontaneria', m:[0.4,0.65], dib:dInodoro},
@@ -502,6 +508,7 @@
     plc:          {nombre:'PLC',            capa:'datos', cat:'datos', m:[0.16,0.22],  dib:dPLC},
     pc:           {nombre:'Ordenador',      capa:'datos', cat:'datos', m:[0.45,0.4],   dib:dPC},
     subidared:    {nombre:'Subida red (planta)', capa:'datos', cat:'datos', m:[0.32,0.32], dib:dSubidaRed},
+    tomatel:      {nombre:'Toma teléfono',  capa:'datos', cat:'datos', m:[0.35,0.35], dib:dTomaTel},
   };
 
   // Herramientas de dibujo directo
@@ -530,8 +537,8 @@
   ];
 
   const ICONOS_SIMB = {
-    enchufe:'🔌',enchufe2:'🔌',interruptor:'💡',conmutador:'🔀',luz:'⭕',aplique:'🔆',cuadro:'⚡',tvtoma:'📺',redtoma:'🌐',
-    router:'📶',ap:'📡',switchred:'🔳',roseta:'🟪',plc:'🔌',pc:'💻',subida:'↕️',subidared:'↕️',
+    enchufe:'🔌',enchufe2:'🔌',interruptor:'💡',conmutador:'🔀',intdoble:'🎚️',luz:'⭕',luzpared:'◐',aplique:'🔆',focoled:'🔦',tiraled:'➖',cuadro:'⚡',timbre:'🔔',persianas:'🪟',tvtoma:'📺',redtoma:'🌐',
+    router:'📶',ap:'📡',switchred:'🔳',roseta:'🟪',plc:'🔌',pc:'💻',tomatel:'📞',subida:'↕️',subidared:'↕️',
     inodoro:'🚽',lavabo:'🧼',bidet:'🚿',ducha:'🚿',banera:'🛁',fregadero:'🚰',
     camadoble:'🛏️',camaind:'🛏️',sofa:'🛋️',mesa:'🪑',silla:'🪑',armario:'🚪',nevera:'🧊',cocina:'🍳',lavadora:'🌀',tv:'📺',
   };
@@ -1126,7 +1133,7 @@
     const w=mPx(s.m[0])*(o.escalaX||o.escala||1), h=mPx(s.m[1])*(o.escalaY||o.escala||1);
     const en = (!dibujandoFantasma && simulando && o.capa==='electrico' && simRes) ? simRes.devEn.get(o.id) : undefined;
     // halo de luz para luces encendidas
-    if(en && (o.clave==='luz'||o.clave==='aplique')){
+    if(en && ['luz','aplique','luzpared','focoled','tiraled'].includes(o.clave)){
       const r=Math.max(w,h)*1.4;
       const g=ctx.createRadialGradient(0,0,0,0,0,r);
       g.addColorStop(0,'rgba(253,224,71,.85)'); g.addColorStop(1,'rgba(253,224,71,0)');
@@ -1199,35 +1206,67 @@
   function cir(c,x,y,r,col,relleno){ c.beginPath(); c.arc(x,y,r,0,7); if(relleno){c.fillStyle=relleno;c.fill();} c.strokeStyle=col;c.lineWidth=2.5;c.stroke(); }
   function lin(c,x1,y1,x2,y2,col,gr){ c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.strokeStyle=col; c.lineWidth=gr||2.5; c.stroke(); }
 
-  // Eléctrico (verde)
-  // --- símbolos eléctricos normalizados (estilo plano profesional) ---
-  // Toma de corriente: semicírculo + diámetro + vástago; toma de tierra = línea paralela
-  function dEnchufe(c,w,h){ const r=Math.min(w,h)*0.46,col='#16a34a';
-    c.beginPath(); c.arc(0,0,r,Math.PI,2*Math.PI); c.lineWidth=2.5; c.strokeStyle=col; c.stroke();
-    lin(c,-r,0,r,0,col,2.5); lin(c,0,0,0,r*1.15,col,2.5); lin(c,-r*0.42,r*0.55,r*0.42,r*0.55,col,2); }
-  // Toma doble: dos semicírculos sobre el mismo diámetro
-  function dEnchufe2(c,w,h){ const r=Math.min(w,h)*0.42,col='#16a34a';
-    lin(c,-r*2,0,r*2,0,col,2.5);
-    [-r,r].forEach(cx=>{ c.beginPath(); c.arc(cx,0,r,Math.PI,2*Math.PI); c.lineWidth=2.5; c.strokeStyle=col; c.stroke(); });
-    lin(c,0,0,0,r*1.15,col,2.5); lin(c,-r*0.42,r*0.55,r*0.42,r*0.55,col,2); }
-  // Interruptor unipolar: punto de contacto + palanca a 45°
-  function dInterruptor(c,w,h){ const r=Math.min(w,h)*0.5,col='#16a34a';
-    lin(c,0,0,r*0.95,-r*0.95,col,2.5); cir(c,0,0,r*0.16,col,col); }
-  // Conmutador (dos direcciones): punto + palanca doble
-  function dConmutador(c,w,h){ const r=Math.min(w,h)*0.5,col='#16a34a';
-    lin(c,0,0,r*0.95,-r*0.95,col,2.5); lin(c,0,0,r*0.5,-r*1.02,col,2.5); cir(c,0,0,r*0.16,col,col); }
-  // Punto de luz (techo): círculo con aspa
-  function dLuz(c,w,h){ const r=Math.min(w,h)*0.42,col='#f59e0b'; cir(c,0,0,r,col); const d=r*0.72; lin(c,-d,-d,d,d,col,2.2); lin(c,d,-d,-d,d,col,2.2); }
-  // Aplique de pared: círculo con aspa unido a la pared
-  function dAplique(c,w,h){ const col='#f59e0b'; const r=Math.min(w,h)*0.4;
-    lin(c,-r*1.15,r*0.75,r*1.15,r*0.75,col,2.5); cir(c,0,0,r,col); const d=r*0.7; lin(c,-d,-d,d,d,col,2); lin(c,d,-d,-d,d,col,2); lin(c,0,r,0,r*0.75,col,2); }
-  // Cuadro / tablero eléctrico: rectángulo con tramado diagonal
-  function dCuadro(c,w,h){ const col='#dc2626'; rc(c,-w/2,-h/2,w,h,col,'#fff');
-    c.save(); c.beginPath(); c.rect(-w/2,-h/2,w,h); c.clip(); c.strokeStyle=col; c.lineWidth=1.6;
-    for(let x=-w;x<w;x+=Math.max(5,w*0.24)){ c.beginPath(); c.moveTo(x,-h/2); c.lineTo(x+h,h/2); c.stroke(); }
-    c.restore(); }
-  function dTomaTV(c,w,h){ const r=w/2,col='#16a34a'; c.beginPath(); c.arc(0,0,r,Math.PI,2*Math.PI); c.strokeStyle=col; c.lineWidth=2.5; c.stroke(); lin(c,-r,0,r,0,col,2.5); c.fillStyle=col; c.font=`bold ${w*0.4}px Segoe UI`; c.textAlign='center'; c.textBaseline='middle'; c.fillText('TV',0,-r*0.45); }
-  function dTomaRed(c,w,h){ const r=w/2,col='#16a34a'; c.beginPath(); c.moveTo(-r,-r*0.55); c.lineTo(r,-r*0.55); c.lineTo(0,r*0.8); c.closePath(); c.strokeStyle=col; c.lineWidth=2.5; c.stroke(); }
+  // ====== Eléctrico — simbología de plano de vivienda (según leyenda estándar) ======
+  // Toma de corriente "peine": barra + vástago + dientes (el central = toma de tierra)
+  function dEnchufe(c,w,h){ const col='#16a34a', t=Math.min(w,h), bw=t*0.86, by=t*0.06;
+    lin(c,-bw/2,by,bw/2,by,col,2.4);
+    lin(c,0,by,0,by+t*0.46,col,2.4);
+    lin(c,-bw*0.38,by,-bw*0.38,by-t*0.30,col,2.4);
+    lin(c,0,by,0,by-t*0.46,col,2.4);
+    lin(c,bw*0.38,by,bw*0.38,by-t*0.30,col,2.4); }
+  // Toma doble: barra ancha con cinco dientes
+  function dEnchufe2(c,w,h){ const col='#16a34a', t=Math.min(w,h), bw=Math.max(w,h)*0.9, by=t*0.06;
+    lin(c,-bw/2,by,bw/2,by,col,2.4);
+    lin(c,0,by,0,by+t*0.46,col,2.4);
+    [-0.44,-0.22,0,0.22,0.44].forEach((f,i)=>{ const up=(i===2)?t*0.46:t*0.3; lin(c,f*bw,by,f*bw,by-up,col,2.4); }); }
+  // Interruptor sencillo: terminal (círculo abierto) + palanca a 45°
+  function dInterruptor(c,w,h){ const col='#16a34a', r=Math.min(w,h)*0.5;
+    cir(c,-r*0.62,r*0.62,r*0.2,col); lin(c,-r*0.48,r*0.48,r*0.92,-r*0.92,col,2.4); }
+  // Conmutador (dos direcciones): terminal + palanca con segundo contacto
+  function dConmutador(c,w,h){ const col='#16a34a', r=Math.min(w,h)*0.5;
+    cir(c,-r*0.62,r*0.62,r*0.2,col); lin(c,-r*0.48,r*0.48,r*0.9,-r*0.9,col,2.4); lin(c,r*0.9,-r*0.9,r*0.42,-r*1.05,col,2.4); }
+  // Interruptor doble: un terminal con dos palancas
+  function dIntDoble(c,w,h){ const col='#16a34a', r=Math.min(w,h)*0.5;
+    cir(c,-r*0.62,r*0.62,r*0.2,col); lin(c,-r*0.48,r*0.48,r*0.86,-r*0.96,col,2.4); lin(c,-r*0.42,r*0.54,r*1.02,-r*0.18,col,2.4); }
+  // Punto de luz (techo): círculo con aspa (⊗)
+  function dLuz(c,w,h){ const col='#f59e0b', r=Math.min(w,h)*0.42, d=r*0.707; cir(c,0,0,r,col); lin(c,-d,-d,d,d,col,2.2); lin(c,d,-d,-d,d,col,2.2); }
+  // Punto de luz pared: semicírculo + vástago a la pared
+  function dLuzPared(c,w,h){ const col='#f59e0b', r=Math.min(w,h)*0.42;
+    c.beginPath(); c.arc(0,0,r,-Math.PI/2,Math.PI/2); c.strokeStyle=col; c.lineWidth=2.4; c.stroke();
+    lin(c,0,-r,0,r,col,2.4); lin(c,0,0,-r*1.7,0,col,2.4); }
+  // Aplique de pared: ⊗ con vástago a la pared
+  function dAplique(c,w,h){ const col='#f59e0b', t=Math.min(w,h), r=t*0.32, cy=t*0.08, d=r*0.707;
+    cir(c,0,cy,r,col); lin(c,-d,cy-d,d,cy+d,col,2.2); lin(c,d,cy-d,-d,cy+d,col,2.2);
+    lin(c,0,cy-r,0,-t*0.42,col,2.2); lin(c,-t*0.26,-t*0.42,t*0.26,-t*0.42,col,2.2); }
+  // Foco LED exterior estanco: rectángulo con divisiones verticales
+  function dFocoLed(c,w,h){ const col='#f59e0b', t=Math.min(w,h);
+    rc(c,-t*0.28,-t*0.42,t*0.56,t*0.84,col);
+    lin(c,-t*0.06,-t*0.42,-t*0.06,t*0.42,col,2); lin(c,t*0.06,-t*0.42,t*0.06,t*0.42,col,2); }
+  // Tira de LED: barra gruesa
+  function dTiraLed(c,w,h){ lin(c,-w*0.46,0,w*0.46,0,'#f59e0b',Math.max(4,Math.min(w,h)*0.55)); }
+  // Cuadro general: módulo relleno + barra + salidas (peine)
+  function dCuadro(c,w,h){ const col='#dc2626', t=Math.min(w,h), x0=-w*0.4+t*0.34;
+    c.fillStyle=col; c.fillRect(-w*0.4,-h*0.4,t*0.34,t*0.34);
+    lin(c,x0,-h*0.45,x0,h*0.45,col,2.6);
+    [-0.3,-0.08,0.14,0.36].forEach(f=>lin(c,x0,h*f,x0+w*0.55,h*f,col,2.2)); }
+  // Timbre ding-dong
+  function dTimbre(c,w,h){ const col='#16a34a', t=Math.min(w,h); rc(c,-w*0.36,-t*0.3,w*0.72,t*0.6,col);
+    for(let i=-1;i<=1;i++) lin(c,-w*0.26,t*0.16*i,w*0.26,t*0.16*i,col,1.8); }
+  // Interruptor de persianas (subir / bajar)
+  function dPersianas(c,w,h){ const col='#16a34a', t=Math.min(w,h); rc(c,-w*0.4,-t*0.34,w*0.8,t*0.68,col);
+    lin(c,-w*0.16,t*0.22,-w*0.16,-t*0.2,col,2); c.beginPath(); c.moveTo(-w*0.24,-t*0.05); c.lineTo(-w*0.16,-t*0.22); c.lineTo(-w*0.08,-t*0.05); c.strokeStyle=col; c.lineWidth=2; c.stroke();
+    lin(c,w*0.16,-t*0.22,w*0.16,t*0.2,col,2); c.beginPath(); c.moveTo(w*0.08,t*0.05); c.lineTo(w*0.16,t*0.22); c.lineTo(w*0.24,t*0.05); c.strokeStyle=col; c.lineWidth=2; c.stroke(); }
+  // Toma de TV / RTV: círculo con "TV"
+  function dTomaTV(c,w,h){ const col='#16a34a', r=Math.min(w,h)*0.46; cir(c,0,0,r,col);
+    c.fillStyle=col; c.font='bold '+(r*0.78)+'px Inter, Segoe UI'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('TV',0,0); }
+  // Toma de teléfono: círculo con "T"
+  function dTomaTel(c,w,h){ const col='#7c3aed', r=Math.min(w,h)*0.46; cir(c,0,0,r,col);
+    c.fillStyle=col; c.font='bold '+(r*0.9)+'px Inter, Segoe UI'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('T',0,0); }
+  // Toma de datos RJ-45: caja con conector
+  function dTomaRed(c,w,h){ const col='#16a34a', t=Math.min(w,h);
+    rc(c,-t*0.42,-t*0.42,t*0.84,t*0.84,col);
+    rc(c,-t*0.2,-t*0.13,t*0.4,t*0.27,col);
+    lin(c,-t*0.08,t*0.14,-t*0.08,t*0.28,col,1.8); lin(c,t*0.08,t*0.14,t*0.08,t*0.28,col,1.8); }
 
   // Fontanería (azul)
   function dInodoro(c,w,h){ const col='#0ea5e9'; rc(c,-w/2,-h/2,w,h*0.25,col,'#e0f2fe'); c.beginPath(); c.ellipse(0,h*0.1,w*0.42,h*0.32,0,0,7); c.fillStyle='#e0f2fe';c.fill();c.strokeStyle=col;c.lineWidth=2.5;c.stroke(); }
