@@ -460,6 +460,7 @@
     muebles:     {nombre:'Muebles',      color:'#92400e', visible:true},
     datos:       {nombre:'Red / Datos',  color:'#7c3aed', visible:true},
     anotacion:   {nombre:'Anotaciones',  color:'#dc2626', visible:true},
+    clima:       {nombre:'Calefacción/Clima', color:'#ea580c', visible:true},
     medidas:     {nombre:'Medidas',      color:'#1d4ed8', visible:true},
   };
 
@@ -481,6 +482,9 @@
     tiraled:      {nombre:'Tira LED',       capa:'electrico', cat:'electrico', m:[0.9,0.12],  dib:dTiraLed},
     timbre:       {nombre:'Timbre',         capa:'electrico', cat:'electrico', m:[0.45,0.35], dib:dTimbre},
     persianas:    {nombre:'Int. persianas', capa:'electrico', cat:'electrico', m:[0.4,0.35],  dib:dPersianas},
+    pulsador:     {nombre:'Pulsador',       capa:'electrico', cat:'electrico', m:[0.3,0.3],   dib:dPulsador},
+    cgp:          {nombre:'Caja gral. prot.',capa:'electrico', cat:'electrico', m:[0.4,0.5],  dib:dCGP},
+    contador:     {nombre:'Contador',       capa:'electrico', cat:'electrico', m:[0.5,0.35],  dib:dContador},
     subida:       {nombre:'Subida (planta)',capa:'electrico', cat:'electrico', m:[0.32,0.32], dib:dSubida},
     // --- Fontanería ---
     inodoro:      {nombre:'Inodoro',        capa:'fontaneria', cat:'fontaneria', m:[0.4,0.65], dib:dInodoro},
@@ -509,6 +513,14 @@
     pc:           {nombre:'Ordenador',      capa:'datos', cat:'datos', m:[0.45,0.4],   dib:dPC},
     subidared:    {nombre:'Subida red (planta)', capa:'datos', cat:'datos', m:[0.32,0.32], dib:dSubidaRed},
     tomatel:      {nombre:'Toma teléfono',  capa:'datos', cat:'datos', m:[0.35,0.35], dib:dTomaTel},
+    tlca:         {nombre:'Terminal TLCA',  capa:'datos', cat:'datos', m:[0.35,0.35], dib:dTLCA},
+    porteroplaca: {nombre:'Portero (calle)',capa:'datos', cat:'datos', m:[0.4,0.55],  dib:dPorteroPlaca},
+    porterointer: {nombre:'Portero (interior)', capa:'datos', cat:'datos', m:[0.4,0.4], dib:dPorteroInt},
+    // --- Calefacción / Clima ---
+    radiador:     {nombre:'Radiador',       capa:'clima', cat:'clima', m:[1.0,0.45], dib:dRadiador},
+    split:        {nombre:'Split A/A',      capa:'clima', cat:'clima', m:[0.85,0.35], dib:dSplit},
+    suelorad:     {nombre:'Suelo radiante', capa:'clima', cat:'clima', m:[1.0,1.0],  dib:dSueloRad},
+    termo:        {nombre:'Termo/caldera',  capa:'clima', cat:'clima', m:[0.5,0.7],  dib:dTermo},
   };
 
   // Herramientas de dibujo directo
@@ -528,6 +540,7 @@
         {h:'cablered', ico:'🌐', txt:'Cable de red'},
       ]},
     {seccion:'Fontanería', cat:'fontaneria'},
+    {seccion:'Calefacción/Clima', cat:'clima'},
     {seccion:'Muebles', cat:'muebles'},
     {seccion:'Anotar', items:[
         {h:'cota', ico:'📏', txt:'Medida'},
@@ -537,8 +550,9 @@
   ];
 
   const ICONOS_SIMB = {
-    enchufe:'🔌',enchufe2:'🔌',interruptor:'💡',conmutador:'🔀',intdoble:'🎚️',luz:'⭕',luzpared:'◐',aplique:'🔆',focoled:'🔦',tiraled:'➖',cuadro:'⚡',timbre:'🔔',persianas:'🪟',tvtoma:'📺',redtoma:'🌐',
-    router:'📶',ap:'📡',switchred:'🔳',roseta:'🟪',plc:'🔌',pc:'💻',tomatel:'📞',subida:'↕️',subidared:'↕️',
+    enchufe:'🔌',enchufe2:'🔌',interruptor:'💡',conmutador:'🔀',intdoble:'🎚️',luz:'⭕',luzpared:'◐',aplique:'🔆',focoled:'🔦',tiraled:'➖',cuadro:'⚡',timbre:'🔔',persianas:'🪟',pulsador:'🔘',cgp:'🛡️',contador:'🔢',tvtoma:'📺',redtoma:'🌐',
+    router:'📶',ap:'📡',switchred:'🔳',roseta:'🟪',plc:'🔌',pc:'💻',tomatel:'📞',tlca:'📡',porteroplaca:'🔊',porterointer:'📟',subida:'↕️',subidared:'↕️',
+    radiador:'♨️',split:'❄️',suelorad:'🌡️',termo:'🔥',
     inodoro:'🚽',lavabo:'🧼',bidet:'🚿',ducha:'🚿',banera:'🛁',fregadero:'🚰',
     camadoble:'🛏️',camaind:'🛏️',sofa:'🛋️',mesa:'🪑',silla:'🪑',armario:'🚪',nevera:'🧊',cocina:'🍳',lavadora:'🌀',tv:'📺',
   };
@@ -1140,7 +1154,7 @@
       ctx.save(); ctx.rotate(-(o.ang||0)*Math.PI/180); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,r,0,7); ctx.fill(); ctx.restore();
     }
     ctx.lineJoin='round'; ctx.lineCap='round';
-    s.dib(ctx,w,h);
+    s.dib(ctx,w,h,o);
     // indicador de estado eléctrico
     if(!dibujandoFantasma && simulando && o.capa==='electrico' && simRes){
       ctx.save(); ctx.rotate(-(o.ang||0)*Math.PI/180);
@@ -1207,18 +1221,24 @@
   function lin(c,x1,y1,x2,y2,col,gr){ c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.strokeStyle=col; c.lineWidth=gr||2.5; c.stroke(); }
 
   // ====== Eléctrico — simbología de plano de vivienda (según leyenda estándar) ======
+  // Trazos de amperaje sobre el vástago (16A=1, 25A=2) y "E" si es estanco
+  function dEnchAmp(c,col,t,by,o){ const amp=(o&&o.amperaje)||16, n=amp>=25?2:amp>=16?1:0;
+    for(let i=0;i<n;i++){ const y=by+t*0.24+i*t*0.16; lin(c,-t*0.11,y,t*0.11,y,col,2.2); }
+    if(o&&o.estanca){ c.fillStyle=col; c.font='bold '+(t*0.3)+'px Inter, Segoe UI'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('E',t*0.52,-t*0.14); } }
   // Toma de corriente "peine": barra + vástago + dientes (el central = toma de tierra)
-  function dEnchufe(c,w,h){ const col='#16a34a', t=Math.min(w,h), bw=t*0.86, by=t*0.06;
+  function dEnchufe(c,w,h,o){ const col='#16a34a', t=Math.min(w,h), bw=t*0.86, by=t*0.06;
     lin(c,-bw/2,by,bw/2,by,col,2.4);
-    lin(c,0,by,0,by+t*0.46,col,2.4);
+    lin(c,0,by,0,by+t*0.5,col,2.4);
     lin(c,-bw*0.38,by,-bw*0.38,by-t*0.30,col,2.4);
     lin(c,0,by,0,by-t*0.46,col,2.4);
-    lin(c,bw*0.38,by,bw*0.38,by-t*0.30,col,2.4); }
+    lin(c,bw*0.38,by,bw*0.38,by-t*0.30,col,2.4);
+    dEnchAmp(c,col,t,by,o); }
   // Toma doble: barra ancha con cinco dientes
-  function dEnchufe2(c,w,h){ const col='#16a34a', t=Math.min(w,h), bw=Math.max(w,h)*0.9, by=t*0.06;
+  function dEnchufe2(c,w,h,o){ const col='#16a34a', t=Math.min(w,h), bw=Math.max(w,h)*0.9, by=t*0.06;
     lin(c,-bw/2,by,bw/2,by,col,2.4);
-    lin(c,0,by,0,by+t*0.46,col,2.4);
-    [-0.44,-0.22,0,0.22,0.44].forEach((f,i)=>{ const up=(i===2)?t*0.46:t*0.3; lin(c,f*bw,by,f*bw,by-up,col,2.4); }); }
+    lin(c,0,by,0,by+t*0.5,col,2.4);
+    [-0.44,-0.22,0,0.22,0.44].forEach((f,i)=>{ const up=(i===2)?t*0.46:t*0.3; lin(c,f*bw,by,f*bw,by-up,col,2.4); });
+    dEnchAmp(c,col,t,by,o); }
   // Interruptor sencillo: terminal (círculo abierto) + palanca a 45°
   function dInterruptor(c,w,h){ const col='#16a34a', r=Math.min(w,h)*0.5;
     cir(c,-r*0.62,r*0.62,r*0.2,col); lin(c,-r*0.48,r*0.48,r*0.92,-r*0.92,col,2.4); }
@@ -1267,6 +1287,27 @@
     rc(c,-t*0.42,-t*0.42,t*0.84,t*0.84,col);
     rc(c,-t*0.2,-t*0.13,t*0.4,t*0.27,col);
     lin(c,-t*0.08,t*0.14,-t*0.08,t*0.28,col,1.8); lin(c,t*0.08,t*0.14,t*0.08,t*0.28,col,1.8); }
+  // Pulsador (timbre): círculo con punto central relleno
+  function dPulsador(c,w,h){ const col='#16a34a', r=Math.min(w,h)*0.4; cir(c,0,0,r,col); cir(c,0,0,r*0.32,col,col); }
+  // Caja general de protección: caja con fusible
+  function dCGP(c,w,h){ const col='#dc2626', t=Math.min(w,h); rc(c,-t*0.32,-t*0.42,t*0.64,t*0.84,col); rc(c,-t*0.14,-t*0.2,t*0.28,t*0.4,col); lin(c,0,-t*0.2,0,t*0.2,col,2); }
+  // Contador: caja con dos celdas
+  function dContador(c,w,h){ const col='#16a34a', t=Math.min(w,h); rc(c,-w*0.42,-t*0.3,w*0.84,t*0.6,col); c.fillStyle=col; c.fillRect(-w*0.32,-t*0.16,w*0.26,t*0.32); c.fillRect(w*0.06,-t*0.16,w*0.26,t*0.32); }
+  // Terminal TLCA (cable): círculo "TC"
+  function dTLCA(c,w,h){ const col='#7c3aed', r=Math.min(w,h)*0.46; cir(c,0,0,r,col); c.fillStyle=col; c.font='bold '+(r*0.7)+'px Inter, Segoe UI'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('TC',0,0); }
+  // Portero automático (placa de calle)
+  function dPorteroPlaca(c,w,h){ const col='#7c3aed', t=Math.min(w,h); rc(c,-w*0.46,-t*0.5,w*0.92,t,col); for(let i=-2;i<=2;i++) lin(c,w*0.12*i,-t*0.22,w*0.12*i,t*0.22,col,1.6); }
+  // Portero automático (unidad interior): caja "PA"
+  function dPorteroInt(c,w,h){ const col='#7c3aed', t=Math.min(w,h); rc(c,-w*0.4,-t*0.42,w*0.8,t*0.84,col); c.fillStyle=col; c.font='bold '+(t*0.34)+'px Inter, Segoe UI'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('PA',0,0); }
+
+  // ====== Calefacción / Clima (naranja) ======
+  function dRadiador(c,w,h){ const col='#ea580c'; rc(c,-w*0.46,-h*0.4,w*0.92,h*0.8,col); const N=7; for(let i=0;i<N;i++){ const x=-w*0.4+(w*0.8)*(i/(N-1)); lin(c,x,-h*0.34,x,h*0.34,col,1.8); } }
+  function dSplit(c,w,h){ const col='#ea580c'; rc(c,-w*0.46,-h*0.34,w*0.92,h*0.42,col); lin(c,-w*0.4,-h*0.04,w*0.4,-h*0.04,col,1.6);
+    c.beginPath(); [[-0.3,0.26],[-0.18,0.16],[-0.06,0.26],[0.06,0.16],[0.18,0.26],[0.3,0.16]].forEach((p,i)=>{ const X=p[0]*w,Y=p[1]*h; i?c.lineTo(X,Y):c.moveTo(X,Y); }); c.strokeStyle=col; c.lineWidth=1.8; c.stroke(); }
+  function dSueloRad(c,w,h){ const col='#ea580c'; rc(c,-w*0.42,-h*0.42,w*0.84,h*0.84,col);
+    c.beginPath(); [[-0.3,-0.3],[0.3,-0.3],[0.3,-0.12],[-0.3,-0.12],[-0.3,0.06],[0.3,0.06],[0.3,0.24],[-0.3,0.24]].forEach((p,i)=>{ const X=p[0]*w,Y=p[1]*h; i?c.lineTo(X,Y):c.moveTo(X,Y); }); c.strokeStyle=col; c.lineWidth=1.8; c.stroke(); }
+  function dTermo(c,w,h){ const col='#ea580c', t=Math.min(w,h); rc(c,-w*0.26,-h*0.42,w*0.52,h*0.84,col); cir(c,0,-h*0.1,t*0.16,col);
+    c.beginPath(); c.moveTo(-t*0.12,h*0.28); c.lineTo(0,h*0.14); c.lineTo(t*0.12,h*0.28); c.strokeStyle=col; c.lineWidth=1.8; c.stroke(); }
 
   // Fontanería (azul)
   function dInodoro(c,w,h){ const col='#0ea5e9'; rc(c,-w/2,-h/2,w,h*0.25,col,'#e0f2fe'); c.beginPath(); c.ellipse(0,h*0.1,w*0.42,h*0.32,0,0,7); c.fillStyle='#e0f2fe';c.fill();c.strokeStyle=col;c.lineWidth=2.5;c.stroke(); }
@@ -1754,7 +1795,11 @@
         }
       }
       if(o.clave==='luz'||o.clave==='aplique'){ html+=propNum('Potencia (W)','vatios',o.vatios||60); }
-      if(o.clave==='enchufe'||o.clave==='enchufe2'){ html+=propNum('Consumo (W)','vatios',o.vatios||0); }
+      if(o.clave==='enchufe'||o.clave==='enchufe2'){
+        html+=propSelect('Amperaje','amperaje',(o.amperaje||16)+'', [['10','10 A (alumbrado)'],['16','16 A (usos varios)'],['25','25 A (cocina)']]);
+        html+=propCheck('Estanco (exterior/baño)','estanca',!!o.estanca);
+        html+=propNum('Consumo (W)','vatios',o.vatios||0);
+      }
       if(o.capa==='electrico' && simRes){
         const en=simRes.devEn.get(o.id);
         html+=`<div class="prop-fila"><label>Estado: <b style="color:${en?'#16a34a':'#94a3b8'}">${en?'⚡ Con corriente':'⭘ Sin corriente'}</b></label></div>`;
@@ -1807,6 +1852,7 @@
   function propTexto(lbl,campo,val){ return `<div class="prop-fila"><label>${lbl}</label><input type="text" value="${(''+val).replace(/"/g,'&quot;')}" oninput="editarProp('${campo}',this.value)"></div>`; }
   function propNum(lbl,campo,val){ return `<div class="prop-fila"><label>${lbl}</label><input type="text" inputmode="decimal" value="${(''+val).replace('.',',')}" onchange="editarProp('${campo}',this.value)"></div>`; }
   function propSelect(lbl,campo,val,opts){ return `<div class="prop-fila"><label>${lbl}</label><select onchange="editarProp('${campo}',this.value)">${opts.map(o=>`<option value="${o[0]}" ${o[0]===val?'selected':''}>${o[1]}</option>`).join('')}</select></div>`; }
+  function propCheck(lbl,campo,val){ return `<div class="prop-fila"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" style="width:auto;transform:scale(1.2)" ${val?'checked':''} onchange="editarProp('${campo}',this.checked)"> ${lbl}</label></div>`; }
   function toggleInterruptor(id){ const o=objetos.find(x=>x.id===id); if(!o) return; guardarHistorial(); o.encendido=!(o.encendido!==false); mostrarPropiedades(); redibujar(); }
   function toggleWifi(id){ const o=objetos.find(x=>x.id===id); if(!o) return; guardarHistorial(); o.wifi=!(o.wifi!==false); mostrarPropiedades(); redibujar(); }
   function setAlcance(id,v){ const o=objetos.find(x=>x.id===id); if(!o) return; o.alcance=parseInt(v)||10; const l=document.getElementById('lblAlc'); if(l) l.textContent=o.alcance+' m'; autoguardar(); redibujar(); }
@@ -1846,6 +1892,7 @@
     else if(campo==='subred'){ o.subred=valor; }
     else if(campo==='voltaje'){ o.voltaje=num||230; }
     else if(campo==='amperaje'){ o.amperaje=num||25; }
+    else if(campo==='estanca'){ o.estanca=(valor===true||valor==='true'); }
     else if(campo==='vatios'){ o.vatios=isNaN(num)?0:num; }
     else if(campo==='anchoM'){ const x=Math.min(o.x1,o.x2); o.x1=x; o.x2=x+mPx(num); }
     else if(campo==='altoM'){ const y=Math.min(o.y1,o.y2); o.y1=y; o.y2=y+mPx(num); }
