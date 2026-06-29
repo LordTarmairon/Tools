@@ -121,10 +121,12 @@
     .herramientas .hbtn .ico{font-size:16px; width:20px; text-align:center;}
     /* paneles laterales ocultables (escritorio) */
     .herramientas.oculto, .propiedades.oculto{ display:none; }
-    .panel-tog{ position:absolute; top:50%; transform:translateY(-50%); z-index:8; width:20px; height:56px; border-radius:8px;
+    .panel-tog{ position:absolute; top:50%; margin-top:-28px; z-index:8; width:20px; height:56px; border-radius:8px;
       background:var(--panel); color:#cbd5e1; display:flex; align-items:center; justify-content:center; padding:0; font-size:13px;
-      box-shadow:0 2px 8px rgba(2,6,23,.3); border:1px solid var(--linea); }
-    .panel-tog:hover{ background:var(--panel2); }
+      box-shadow:0 2px 8px rgba(2,6,23,.3); border:1px solid var(--linea);
+      opacity:0; pointer-events:none; transition:opacity .15s; }
+    .panel-tog.ver{ opacity:1; pointer-events:auto; }
+    .panel-tog:hover, .panel-tog:active{ background:var(--panel2); transform:none; }
     .tog-izq{ left:6px; } .tog-der{ right:6px; }
 
     /* ===== Lienzo ===== */
@@ -1937,7 +1939,21 @@
     const i=btn && btn.querySelector('i');
     if(i){ if(id==='herramientas') i.className = oc?'bi bi-chevron-right':'bi bi-chevron-left';
            else i.className = oc?'bi bi-chevron-left':'bi bi-chevron-right'; }
+    if(btn) btn.classList.toggle('ver', oc);   // colapsado → botón siempre visible; abierto → se oculta hasta pasar el ratón
     ajustarTamano();
+  }
+  // los botones de plegar solo aparecen al pasar el ratón por el panel (o sobre el propio botón)
+  function setupPanelTogs(){
+    [['herramientas','togIzq'],['propiedades','togDer']].forEach(([pid,bid])=>{
+      const p=document.getElementById(pid), b=document.getElementById(bid); if(!p||!b) return;
+      let over=false;
+      const mostrar=()=>b.classList.add('ver');
+      const ocultar=()=>{ if(!over && !p.classList.contains('oculto')) b.classList.remove('ver'); };
+      p.addEventListener('mouseenter',()=>{ if(!p.classList.contains('oculto')) mostrar(); });
+      p.addEventListener('mouseleave',ocultar);
+      b.addEventListener('mouseenter',()=>{ over=true; mostrar(); });
+      b.addEventListener('mouseleave',()=>{ over=false; ocultar(); });
+    });
   }
   function toggleMenu(){
     setTopbar();
@@ -2718,6 +2734,7 @@
   } }catch(e){}
   actualizarPlantas();
   aplicarLayout();
+  setupPanelTogs();
 
   function abrir(id){ document.getElementById(id).style.display='flex'; }
   function cerrar(id){ document.getElementById(id).style.display='none'; }
