@@ -718,6 +718,7 @@
   let historial = [], rehacer = [];
   let pendiente = null;         // posición pendiente (texto)
   let _calib = null;            // calibrado de foto: {x1,y1,x2,y2}
+  let _autoT = null;            // temporizador del autoguardado
   let _verBienvenida = true;    // mostrar la pantalla de bienvenida cuando el plano está vacío
   let promptInstalar = null;
   let espacio = false;            // barra espaciadora pulsada (para mover la vista)
@@ -750,7 +751,7 @@
       const c = document.createElement('div'); c.className='contenido-seccion';
       if(grupo.items){
         grupo.items.forEach(it=>{
-          const b=document.createElement('button'); b.className='hbtn'; b.dataset.h=it.h; b.dataset.nombre=it.txt.toLowerCase();
+          const b=document.createElement('button'); b.className='hbtn'; b.dataset.h=it.h; b.dataset.nombre=it.txt.toLowerCase(); b.title=it.txt;
           b.innerHTML=`<span class="ico">${it.ico}</span>${it.txt}`;
           b.onclick = it.fn ? ()=>window[it.fn]() : ()=>elegir(it.h);
           c.appendChild(b);
@@ -760,7 +761,7 @@
         const g=document.createElement('div'); g.className='tiles';
         Object.keys(SIMBOLOS).filter(k=>SIMBOLOS[k].cat===grupo.cat).forEach(k=>{
           const s=SIMBOLOS[k];
-          const b=document.createElement('button'); b.className='tile'; b.dataset.simbolo=k; b.dataset.nombre=s.nombre.toLowerCase();
+          const b=document.createElement('button'); b.className='tile'; b.dataset.simbolo=k; b.dataset.nombre=s.nombre.toLowerCase(); b.title=s.nombre;
           b.innerHTML=`<img src="${miniSimbolo(k)}" alt=""><span>${s.nombre}</span>`;
           b.onclick=()=>elegirSimbolo(k);
           g.appendChild(b);
@@ -1020,6 +1021,7 @@
     dibujarReglas();
     actualizarEstado();
     actualizarBienvenida();
+    programarGuardado();
   }
   function dibujarCalib(){
     const a=aPantalla(_calib.x1,_calib.y1);
@@ -2340,7 +2342,8 @@
   /* =======================================================================
      HISTORIAL
      ======================================================================= */
-  function guardarHistorial(){ historial.push(JSON.stringify(objetos)); if(historial.length>80) historial.shift(); rehacer.length=0; autoguardar(); }
+  function guardarHistorial(){ historial.push(JSON.stringify(objetos)); if(historial.length>80) historial.shift(); rehacer.length=0; }
+  function programarGuardado(){ clearTimeout(_autoT); _autoT=setTimeout(autoguardar, 400); }
   function deshacer(){ if(historial.length){ rehacer.push(JSON.stringify(objetos)); setObjetos(JSON.parse(historial.pop())); seleccion=[]; mostrarPropiedades(); redibujar(); } }
   function rehacerAccion(){ if(rehacer.length){ historial.push(JSON.stringify(objetos)); setObjetos(JSON.parse(rehacer.pop())); seleccion=[]; mostrarPropiedades(); redibujar(); } }
 
@@ -2358,7 +2361,17 @@
   function nuevaPlanta(){ plantas.push({nombre:'Planta '+plantas.length, objetos:[]}); autoguardar(); cambiarPlanta(plantas.length-1); }
   function duplicarPlanta(){ const copia=JSON.parse(JSON.stringify(plantas[plantaActual].objetos)); copia.forEach(o=>o.id=idNuevo()); plantas.push({nombre:plantas[plantaActual].nombre+' (copia)', objetos:copia}); autoguardar(); cambiarPlanta(plantas.length-1); }
   function renombrarPlanta(){ const n=prompt('Nombre de la planta:', plantas[plantaActual].nombre); if(n && n.trim()){ plantas[plantaActual].nombre=n.trim(); actualizarPlantas(); autoguardar(); } }
-  function borrarPlanta(){ if(plantas.length<=1){ alert('Tiene que haber al menos una planta.'); return; } if(confirm('¿Borrar la planta "'+plantas[plantaActual].nombre+'"?')){ plantas.splice(plantaActual,1); autoguardar(); cambiarPlanta(Math.max(0,plantaActual-1)); } }
+  function borrarPlanta(){
+    if(plantas.length<=1){
+      confirmarBonito('Vaciar la planta','Se borrará todo lo dibujado y la planta quedará en blanco.', ()=>{
+        guardarHistorial(); setObjetos([]); plantas[plantaActual].fondo=null; _imgFondo=null; seleccion=[]; historial.length=0; rehacer.length=0; _verBienvenida=true; mostrarPropiedades(); autoguardar(); redibujar();
+      }, '🧹', 'Sí, vaciar');
+      return;
+    }
+    confirmarBonito('¿Borrar la planta?','Se borrará la planta "'+plantas[plantaActual].nombre+'".', ()=>{
+      plantas.splice(plantaActual,1); autoguardar(); cambiarPlanta(Math.max(0,plantaActual-1));
+    }, '🗑️', 'Sí, borrar');
+  }
   function alternarInferior(){ verInferior=!verInferior; document.getElementById('tgInferior').classList.toggle('on',verInferior); redibujar(); }
   function actualizarPlantas(){
     const sel=document.getElementById('selPlanta'); if(!sel) return; sel.innerHTML='';
