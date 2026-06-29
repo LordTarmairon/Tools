@@ -2209,6 +2209,42 @@
     if(r3d.anim){ cancelAnimationFrame(r3d.anim); r3d.anim=null; }
     window.removeEventListener('resize', resize3d);
   }
+  // construye un mueble/sanitario en 3D con piezas reconocibles (no una simple caja)
+  function mueble3D(k,wm,dm){
+    const G=THREE, g=new G.Group();
+    const mat=c=>new G.MeshLambertMaterial({color:c});
+    const matT=c=>new G.MeshLambertMaterial({color:c, transparent:true, opacity:0.4});
+    const box=(w,h,d,c,x,y,z)=>{ const m=new G.Mesh(new G.BoxGeometry(w,h,d), (c&&c.isMaterial)?c:mat(c)); m.position.set(x,y,z); g.add(m); return m; };
+    const cyl=(r,h,c,x,y,z)=>{ const m=new G.Mesh(new G.CylinderGeometry(r,r,h,16), mat(c)); m.position.set(x,y,z); g.add(m); return m; };
+    const WOOD=0x9c7a52, WOOD2=0x7a5c38, WHITE=0xf2efe9, FAB=0x8294b0, APP=0xdfe3e8, DARK=0x334155, SAN=0xeef7fb, BAS=0xcfe6f0;
+    switch(k){
+      case 'camadoble': case 'camaind':
+        box(wm,0.28,dm,WOOD,0,0.14,0); box(wm*0.96,0.16,dm*0.86,WHITE,0,0.36,dm*0.04); box(wm,0.5,0.06,WOOD2,0,0.4,-dm/2+0.03);
+        if(k==='camadoble'){ box(wm*0.36,0.1,dm*0.16,0xffffff,-wm*0.22,0.47,-dm*0.32); box(wm*0.36,0.1,dm*0.16,0xffffff,wm*0.22,0.47,-dm*0.32); }
+        else box(wm*0.7,0.1,dm*0.16,0xffffff,0,0.47,-dm*0.32); break;
+      case 'sofa':
+        box(wm,0.3,dm,FAB,0,0.15,0); box(wm,0.5,0.18,FAB,0,0.4,-dm/2+0.09);
+        box(0.16,0.4,dm,FAB,-wm/2+0.08,0.35,0); box(0.16,0.4,dm,FAB,wm/2-0.08,0.35,0); box(wm-0.32,0.16,dm-0.2,0xa9b3c4,0,0.33,0.05); break;
+      case 'mesa': { box(wm,0.05,dm,WOOD,0,0.73,0); const lx=wm/2-0.06, lz=dm/2-0.06; [[-lx,-lz],[lx,-lz],[-lx,lz],[lx,lz]].forEach(p=>box(0.07,0.72,0.07,WOOD2,p[0],0.36,p[1])); break; }
+      case 'silla': { box(wm,0.05,dm,WOOD,0,0.45,0); box(wm,0.42,0.05,WOOD,0,0.66,-dm/2+0.03); const lx=wm/2-0.04, lz=dm/2-0.04; [[-lx,-lz],[lx,-lz],[-lx,lz],[lx,lz]].forEach(p=>box(0.05,0.44,0.05,WOOD2,p[0],0.22,p[1])); break; }
+      case 'armario':
+        box(wm,2.0,dm,WOOD,0,1.0,0); box(0.02,1.8,0.02,WOOD2,0,1.0,dm/2+0.01);
+        cyl(0.02,0.12,0x553311,-0.06,1.0,dm/2+0.02); cyl(0.02,0.12,0x553311,0.06,1.0,dm/2+0.02); break;
+      case 'nevera':
+        box(wm,1.7,dm,APP,0,0.85,0); box(wm*0.96,0.03,dm*0.5,DARK,0,1.15,dm*0.25);
+        box(0.04,0.5,0.04,0x94a3b8,wm/2-0.08,1.25,dm/2+0.01); box(0.04,0.4,0.04,0x94a3b8,wm/2-0.08,0.6,dm/2+0.01); break;
+      case 'cocina': { box(wm,0.9,dm,APP,0,0.45,0); const bx=wm*0.22,bz=dm*0.22; [[-bx,-bz],[bx,-bz],[-bx,bz],[bx,bz]].forEach(p=>cyl(Math.min(wm,dm)*0.16,0.04,DARK,p[0],0.92,p[1])); break; }
+      case 'lavadora': { box(wm,0.85,dm,0xeef2f7,0,0.425,0); const d=new G.Mesh(new G.CylinderGeometry(Math.min(wm,dm)*0.28,Math.min(wm,dm)*0.28,0.05,20),mat(0x9fb6cf)); d.rotation.x=Math.PI/2; d.position.set(0,0.45,dm/2+0.01); g.add(d); break; }
+      case 'tv': box(0.12,0.5,0.12,DARK,0,0.25,0); box(wm,Math.max(0.5,wm*0.56),0.05,0x0f172a,0,0.82,0); break;
+      case 'inodoro': cyl(dm*0.3,0.4,SAN,0,0.2,dm*0.12); box(wm*0.7,0.5,dm*0.22,SAN,0,0.45,-dm/2+dm*0.11); break;
+      case 'lavabo': case 'fregadero': box(wm,0.1,dm,SAN,0,0.85,0); box(wm*0.6,0.06,dm*0.6,BAS,0,0.83,0); cyl(0.02,0.12,0xb0bccb,0,0.95,-dm*0.3); break;
+      case 'bidet': cyl(Math.min(wm,dm)*0.4,0.4,SAN,0,0.2,0); break;
+      case 'banera': box(wm,0.55,dm,SAN,0,0.275,0); box(wm-0.16,0.4,dm-0.16,BAS,0,0.42,0); break;
+      case 'ducha': box(wm,0.08,dm,SAN,0,0.04,0); box(wm,1.9,0.03,matT(0xbfe0f0),0,0.95,-dm/2+0.015); box(0.03,1.9,dm,matT(0xbfe0f0),-wm/2+0.015,0.95,0); cyl(0.04,0.06,0xb0bccb,wm*0.32,1.85,-dm/2+0.06); break;
+      default: box(wm,0.6,dm,WOOD,0,0.3,0);
+    }
+    return g;
+  }
   function construir3D(){
     const cont=document.getElementById('lienzo3d-cont');
     const W=cont.clientWidth||800, H=cont.clientHeight||600;
@@ -2261,10 +2297,9 @@
         }
         else if(o.tipo==='simbolo' && (o.capa==='muebles'||o.capa==='fontaneria')){
           const s=SIMBOLOS[o.clave]; const wm=s.m[0]*(o.escalaX||o.escala||1), dm=s.m[1]*(o.escalaY||o.escala||1);
-          const h=(o.capa==='muebles')?(ALT_MUEBLE[o.clave]||0.6):(ALT_SANIT[o.clave]||0.5);
-          const mesh=new THREE.Mesh(new THREE.BoxGeometry(wm,h,dm), o.capa==='muebles'?mFurn:mSan);
-          mesh.position.set(pxM(o.x), baseY+h/2, pxM(o.y)); mesh.rotation.y=-(o.ang||0)*Math.PI/180; scene.add(mesh);
-          exp(pxM(o.x),pxM(o.y));
+          const g=mueble3D(o.clave, wm, dm);
+          g.position.set(pxM(o.x), baseY, pxM(o.y)); g.rotation.y=-(o.ang||0)*Math.PI/180; scene.add(g);
+          exp(pxM(o.x),pxM(o.y)); bb.maxy=Math.max(bb.maxy, baseY+(ALT_MUEBLE[o.clave]||ALT_SANIT[o.clave]||1));
         }
         else if(o.tipo==='simbolo'){   // eléctrico / datos: marcadores
           const col=COL_CAPA3D[o.capa]||0x888888; let mesh;
