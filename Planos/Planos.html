@@ -126,6 +126,20 @@
       border:1px solid rgba(255,255,255,.12);
     }
     .ayuda-flotante::after{content:" ✕"; opacity:.6; font-weight:700;}
+    /* pantalla de bienvenida (plano vacío) */
+    .bienvenida{position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:7; padding:18px; pointer-events:none;}
+    .bienvenida.show{display:flex;}
+    .bv-card{pointer-events:auto; max-width:440px; width:100%; background:#fff; border:1px solid #e2e8f0; border-radius:18px; padding:24px 20px; text-align:center; box-shadow:0 22px 55px rgba(2,6,23,.18);}
+    .bv-ico{width:50px; height:50px; border-radius:13px; background:#dbeafe; color:#2563eb; display:inline-flex; align-items:center; justify-content:center; font-size:26px;}
+    .bv-card h2{margin:10px 0 2px; font-size:20px; color:#0f172a;}
+    .bv-card p{margin:0 0 16px; font-size:14px; color:#64748b;}
+    .bv-opts{display:flex; gap:10px;}
+    .bv-opt{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; border:1px solid #e2e8f0; border-radius:13px; background:#fff; padding:14px 8px; cursor:pointer; color:#0f172a; font-family:inherit; transition:transform .12s, border-color .12s, background .12s;}
+    .bv-opt:hover{border-color:#2563eb; background:#f8fafc; transform:translateY(-2px);}
+    .bv-opt i{font-size:24px;}
+    .bv-opt .t{font-size:13.5px; font-weight:600;}
+    .bv-opt .s{font-size:11.5px; color:#64748b; line-height:1.2;}
+    @media(max-width:560px){ .bv-opts{flex-direction:column;} .bv-opt{flex-direction:row; justify-content:flex-start; text-align:left;} .bv-opt .s{display:none;} }
     .tooltip-elem{
       position:absolute; background:rgba(15,23,42,.9); color:#fff; padding:5px 11px;
       border-radius:8px; font-size:13.5px; font-weight:600; pointer-events:none; z-index:8; white-space:nowrap;
@@ -313,6 +327,18 @@
   <!-- Lienzo -->
   <div class="zona-lienzo" id="zonaLienzo">
     <canvas id="lienzo"></canvas>
+    <div class="bienvenida" id="bienvenida">
+      <div class="bv-card">
+        <div class="bv-ico"><i class="bi bi-house-add"></i></div>
+        <h2>Empieza tu plano</h2>
+        <p>Elige cómo quieres empezar. Podrás cambiarlo cuando quieras.</p>
+        <div class="bv-opts">
+          <button class="bv-opt" onclick="cerrarBienvenida()"><i class="bi bi-pencil-square" style="color:#2563eb"></i><span class="t">Plano en blanco</span><span class="s">Dibuja desde cero</span></button>
+          <button class="bv-opt" onclick="cerrarBienvenida();abrirFoto()"><i class="bi bi-image" style="color:#0ea5e9"></i><span class="t">Calcar una foto</span><span class="s">Pon una foto y dibuja encima</span></button>
+          <button class="bv-opt" onclick="cerrarBienvenida();abrir('modalPlantillas')"><i class="bi bi-grid-1x2" style="color:#16a34a"></i><span class="t">Una plantilla</span><span class="s">Baño, cocina, salón…</span></button>
+        </div>
+      </div>
+    </div>
     <button class="fab fab-tl" onclick="toggleDrawer('herramientas')" title="Herramientas"><i class="bi bi-tools"></i></button>
     <button class="fab fab-tr" id="fabProps" onclick="toggleDrawer('propiedades')" title="Propiedades"><i class="bi bi-sliders2"></i></button>
     <div class="ayuda-flotante" id="ayuda">Elige una herramienta y empieza a dibujar</div>
@@ -460,6 +486,21 @@
       </div>
     </div>
     <div class="modal-botones" style="margin-top:12px"><button class="btn-verde" onclick="cerrar('modalFoto')">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- Empezar con una plantilla -->
+<div class="fondo-oscuro" id="modalPlantillas" style="display:none;">
+  <div class="modal" style="max-width:440px;">
+    <h2>🧩 Empezar con una plantilla</h2>
+    <p class="ayuda-txt" style="margin-top:0">Coloca una estancia ya montada (muebles, sanitarios y puntos de luz/enchufes). Después puedes mover y ajustar todo.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button class="btn-azul" onclick="cerrar('modalPlantillas');plSalon()"><i class="bi bi-tv"></i> Salón</button>
+      <button class="btn-azul" onclick="cerrar('modalPlantillas');plDormitorio()"><i class="bi bi-moon-stars"></i> Dormitorio</button>
+      <button class="btn-azul" onclick="cerrar('modalPlantillas');plCocina()"><i class="bi bi-egg-fried"></i> Cocina</button>
+      <button class="btn-azul" onclick="cerrar('modalPlantillas');plBano()"><i class="bi bi-droplet-half"></i> Baño</button>
+    </div>
+    <div class="modal-botones" style="margin-top:12px"><button class="btn-rojo" onclick="cerrar('modalPlantillas')">Cancelar</button></div>
   </div>
 </div>
 
@@ -658,6 +699,7 @@
   let historial = [], rehacer = [];
   let pendiente = null;         // posición pendiente (texto)
   let _calib = null;            // calibrado de foto: {x1,y1,x2,y2}
+  let _verBienvenida = true;    // mostrar la pantalla de bienvenida cuando el plano está vacío
   let promptInstalar = null;
   let espacio = false;            // barra espaciadora pulsada (para mover la vista)
   let simulando = true;           // mostrar simulación eléctrica (brillo de cables)
@@ -722,6 +764,8 @@
     document.querySelectorAll('#herramientas [data-h]').forEach(b=>b.classList.toggle('activa', herramienta!=='simbolo' && b.dataset.h===herramienta));
     document.querySelectorAll('#herramientas [data-simbolo]').forEach(b=>b.classList.toggle('activa', herramienta==='simbolo' && b.dataset.simbolo===simboloActivo));
   }
+  function actualizarBienvenida(){ const el=document.getElementById('bienvenida'); if(el) el.classList.toggle('show', _verBienvenida && objetos.length===0); }
+  function cerrarBienvenida(){ _verBienvenida=false; actualizarBienvenida(); }
 
   function construirCapas(){
     const cont=document.getElementById('panelCapas'); cont.innerHTML='';
@@ -956,6 +1000,7 @@
     if(herramienta==='calibrar' && _calib) dibujarCalib();
     dibujarReglas();
     actualizarEstado();
+    actualizarBienvenida();
   }
   function dibujarCalib(){
     const a=aPantalla(_calib.x1,_calib.y1);
@@ -2331,7 +2376,7 @@
       alert('Plano importado ✓. Pulsa 💾 Guardar si quieres conservarlo en este aparato.');
     }catch(e){ alert('El archivo no es un plano válido.'); } };
     r.readAsText(f); input.value=''; }
-  function nuevoPlanoReset(){ plantas=[{nombre:'Planta baja', objetos:[]}]; plantaActual=0; objetos=plantas[0].objetos; seleccion=[]; circuitos=[]; nombreActual=''; actualizarNombre(); historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); centrarVista(); }
+  function nuevoPlanoReset(){ plantas=[{nombre:'Planta baja', objetos:[]}]; plantaActual=0; objetos=plantas[0].objetos; seleccion=[]; circuitos=[]; nombreActual=''; _verBienvenida=true; actualizarNombre(); historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); centrarVista(); }
   function nuevoPlano(){ if(objetos.length) confirmarBonito('Empezar plano nuevo','Se borrará lo que hay en pantalla. Guarda antes si quieres conservarlo.', nuevoPlanoReset, '🆕', 'Sí, nuevo'); else nuevoPlanoReset(); }
   function actualizarNombre(){ document.getElementById('nombreActual').textContent=nombreActual?('📄 '+nombreActual):''; }
 
