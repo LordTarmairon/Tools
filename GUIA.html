@@ -92,18 +92,28 @@
 <!-- ===================== PLANOS ===================== -->
 <h2 id="planos">📐 Dibujar Planos — casas, electricidad y red</h2>
 
+<h3>Para empezar</h3>
+<p>Al abrir un plano vacío sale la pantalla <b>“Empieza tu plano”</b> con tres opciones: <b>Plano en blanco</b>, <b>Calcar una foto</b> o <b>Usar una plantilla</b> (baño, cocina, salón o dormitorio ya montados).</p>
+
 <h3>Moverte y herramientas</h3>
 <ul>
   <li><b>Mover la vista:</b> arrastra con el <b>botón central (rueda) del ratón</b>, o con <b>Espacio + arrastrar</b>, o con la herramienta <b>✋ Mover vista</b>.</li>
   <li><b>Zoom:</b> rueda del ratón, o los botones ➕ ➖. El 🔍 encuadra todo.</li>
-  <li><b>Herramientas (izquierda):</b> 🧱 Pared, ⬛ Habitación, 🚪 Puerta, 🪟 Ventana, símbolos <b>Eléctricos</b>, de <b>Red/Datos</b>, <b>Fontanería</b>, <b>Muebles</b>, 📏 Medida, 🔤 Texto.</li>
-  <li><b>Seleccionar y cambiar:</b> con 🖱️ toca un elemento; a la derecha puedes <b>girar, duplicar, cambiar tamaño (en metros), borrar</b>. Arrástralo para moverlo (aparecen <b>guías rosas</b> para alinearlo).</li>
+  <li><b>Catálogo (izquierda):</b> arriba hay un <b>buscador</b> — escribe “radiador”, “enchufe”… y filtra. Los elementos están <b>por colores</b> según su grupo (Construir, Eléctrico, Red/Datos, Fontanería, Calefacción/Clima, Muebles) y cada uno muestra su <b>dibujo real</b>. También tienes <b>Plantillas</b> rápidas y, en “Norte / escala”, la <b>flecha de Norte</b> y la <b>barra de escala</b>.</li>
+  <li><b>Seleccionar y cambiar:</b> con 🖱️ toca un elemento; a la derecha puedes <b>girar, duplicar, cambiar tamaño (en metros), borrar</b> y ajustar sus opciones. Arrástralo para moverlo (aparecen <b>guías rosas</b> para alinearlo).</li>
 </ul>
 
 <h3>Arriba (barra de botones)</h3>
 <ul>
-  <li><span class="b">📄 Nuevo</span> · <span class="b">💾 Guardar</span> · <span class="b">📂 Abrir</span> · <span class="b">↩️ Deshacer</span> · <span class="b">🖼️ Imagen</span> · <span class="b">🖨️ Imprimir</span> (con cajetín, leyenda y lista de materiales) · <span class="b">📋 Materiales</span> (presupuesto: cuenta enchufes, luces, metros de cable, m²…).</li>
-  <li><span class="b">▦ Rejilla</span>, <span class="b">🧲 Imán</span> (pega a la cuadrícula para alinear), <span class="b">⌐ 90°</span> (paredes rectas).</li>
+  <li>A la vista: <span class="b">📄 Nuevo</span> · <span class="b">💾 Guardar</span> · <span class="b">📂 Abrir</span> · <span class="b">↩️ Deshacer</span> / <span class="b">↪️ Rehacer</span>.</li>
+  <li><span class="b">▦ Rejilla</span>, <span class="b">🧲 Imán</span> (pega a la cuadrícula para alinear), <span class="b">⌐ 90°</span> (paredes rectas) y <span class="b">Medidas</span> (dónde van las cotas: <b>en el centro</b>, <b>por fuera</b> o <b>por dentro</b> de la pared).</li>
+  <li>El botón <span class="b">⋯ Más</span> guarda el resto: <b>Descargar/Importar</b> el plano, <b>🖨️ Imprimir</b>, <b>📋 Resumen</b>, <b>🔌 Circuitos</b>, <b>🖼️ Foto de fondo</b>, <b>⚡ Probar luz</b>, <b>📶 Probar red</b>, <b>🧊 Ver en 3D</b>, <b>❓ Ayuda</b> e <b>Instalar</b>.</li>
+</ul>
+
+<h3>📋 Resumen del proyecto</h3>
+<p>En <span class="b">⋯ Más → Resumen</span> (también al imprimir) tienes todo de un vistazo: <b>cuadro de superficies</b> (m² de cada estancia y total), <b>materiales</b>, <b>presupuesto</b> y <b>leyenda</b> con los dibujos de los símbolos usados.</p>
+<ul>
+  <li><b>Presupuesto:</b> escribe el <b>precio por unidad</b> de cada cosa (enchufe, metro de cable, puerta…) y calcula el <b>total estimado</b> al momento. Los precios se guardan.</li>
 </ul>
 
 <h3>Plantas (pisos)</h3>
@@ -131,6 +141,27 @@
   <li>Si dos routers usan la <b>misma subred</b>, avisa para que cambies la IP.</li>
 </ul>
 
+<h3>🔌 Circuitos y esquema unifilar</h3>
+<ul>
+  <li>Abre <span class="b">⋯ Más → Circuitos</span>. Pulsa <b>“Circuitos típicos”</b> para crear los de una vivienda (alumbrado, tomas, cocina…) o <b>añádelos</b> uno a uno.</li>
+  <li>Selecciona un enchufe/luz y, en su panel, elige a qué <b>circuito</b> pertenece. El programa calcula solo el <b>magnetotérmico</b> (10/16/25 A) y la <b>sección de cable</b>, y avisa de <b>sobrecarga</b>.</li>
+  <li>El <b>enchufe</b> tiene en su panel el <b>amperaje</b> (10/16/25 A) y si es <b>estanco</b> (exterior/baño); se ve en su dibujo.</li>
+  <li>Con <b>“Ver esquema unifilar”</b> se dibuja el <b>cuadro general</b> (IGA + diferencial + todos los circuitos) y se puede <b>imprimir</b>.</li>
+</ul>
+
+<h3>🖼️ Foto de fondo y ponerla a escala</h3>
+<ul>
+  <li>En <span class="b">⋯ Más → Foto de fondo</span> cargas una foto de un plano para <b>calcar encima</b>; ajustas <b>transparencia</b>, <b>tamaño</b> y la <b>mueves</b>.</li>
+  <li><b>📏 Poner a escala:</b> marca dos puntos de una distancia que conozcas (p. ej. una pared de 4 m) y escribe los metros; la foto se ajusta para que <b>calques con medidas reales</b>.</li>
+</ul>
+
+<h3>🎨 Que el plano quede más profesional</h3>
+<ul>
+  <li><b>Suelo de cada habitación:</b> selecciónala y elige <b>Suelo</b> (baldosa, parquet, tarima, hormigón o césped); se rellena con su textura.</li>
+  <li><b>Norte y escala:</b> en el catálogo, grupo <b>“Norte / escala”</b>, coloca la <b>flecha de Norte</b> y la <b>barra de escala</b> (sale impresa en el plano).</li>
+  <li><b>Capa de Medidas:</b> en el panel de capas puedes <b>mostrar u ocultar</b> todas las cotas y los m².</li>
+</ul>
+
 <h3>↕️ Unir plantas y 🧊 Ver en 3D</h3>
 <ul>
   <li><b>Subidas:</b> para llevar corriente o red de una planta a otra, pon una <b>Subida</b> en el mismo sitio de las dos plantas.</li>
@@ -155,7 +186,7 @@
   <tr><th>Pregunta</th><th>Respuesta</th></tr>
   <tr><td>¿Se borra si apago el aparato?</td><td>No. Todo queda guardado en ese aparato (en el navegador).</td></tr>
   <tr><td>¿Necesito internet?</td><td>No, una vez abierto funciona sin conexión.</td></tr>
-  <tr><td>¿Cómo paso mis datos a otro aparato?</td><td>En la Agenda, con la <b>copia de seguridad</b> (⋯). En Planos, <b>⬇️ Descargar</b> el plano a un archivo y luego <b>⬆️ Importar</b>lo en el otro aparato (también tienes <b>🖼️ Imagen</b> para una foto del plano).</td></tr>
+  <tr><td>¿Cómo paso mis datos a otro aparato?</td><td>En la Agenda, con la <b>copia de seguridad</b> (⋯). En Planos, <b>⋯ Más → Descargar</b> el plano a un archivo y luego <b>Importar</b>lo en el otro aparato.</td></tr>
   <tr><td>La alarma no suena</td><td>Toca una vez la pantalla al abrir la Agenda (activa el sonido) y déjala abierta. Para avisos con la app cerrada, usa "Añadir al calendario del móvil".</td></tr>
   <tr><td>Borré algo sin querer</td><td>En Planos, <span class="b">↩️ Deshacer</span> (o <kbd>Ctrl</kbd>+<kbd>Z</kbd>).</td></tr>
 </table>
