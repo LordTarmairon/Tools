@@ -439,6 +439,7 @@
     <div id="fotoCtrls" style="display:none">
       <label style="font-weight:700">Transparencia</label><input type="range" id="fOpac" min="10" max="100" value="50" oninput="setFotoOpac(this.value)" style="width:100%">
       <label style="font-weight:700">Tamaño</label><input type="range" id="fTam" min="10" max="400" value="100" oninput="setFotoTam(this.value)" style="width:100%">
+      <button class="btn-azul" style="width:100%;margin-top:8px" onclick="startCalib()"><i class="bi bi-rulers"></i> Poner a escala (medida real)</button>
       <div class="modal-botones" style="margin-top:10px">
         <button class="btn-azul" onclick="modoMoverFoto()"><i class="bi bi-arrows-move"></i> Mover</button>
         <button id="btnFotoVis" onclick="toggleFotoVisible()">Ocultar</button>
@@ -446,6 +447,17 @@
       </div>
     </div>
     <div class="modal-botones" style="margin-top:12px"><button class="btn-verde" onclick="cerrar('modalFoto')">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- Calibrar foto a escala -->
+<div class="fondo-oscuro" id="modalCalib" style="display:none;">
+  <div class="modal" style="max-width:360px;text-align:center;">
+    <div style="font-size:42px;line-height:1">📏</div>
+    <h2 style="justify-content:center;margin-top:8px">Poner a escala</h2>
+    <p style="color:var(--gris);font-size:15px;margin-top:0">¿Cuántos metros mide en la realidad la línea que has marcado?</p>
+    <input type="text" id="calibM" inputmode="decimal" placeholder="por ejemplo: 4" style="text-align:center;font-size:18px">
+    <div class="modal-botones"><button onclick="cancelCalib()">Cancelar</button><button class="btn-verde" onclick="aplicarCalib()">Aplicar</button></div>
   </div>
 </div>
 
@@ -560,6 +572,12 @@
         {h:'puerta', ico:'🚪', txt:'Puerta'},
         {h:'ventana', ico:'🪟', txt:'Ventana'},
       ]},
+    {seccion:'Plantillas rápidas', items:[
+        {h:'pl_salon', ico:'🛋️', txt:'Salón', fn:'plSalon'},
+        {h:'pl_dormitorio', ico:'🛏️', txt:'Dormitorio', fn:'plDormitorio'},
+        {h:'pl_cocina', ico:'🍳', txt:'Cocina', fn:'plCocina'},
+        {h:'pl_bano', ico:'🛁', txt:'Baño', fn:'plBano'},
+      ]},
     {seccion:'Eléctrico', cat:'electrico'},
     {seccion:'Red / Datos', cat:'datos', items:[
         {h:'cablered', ico:'🌐', txt:'Cable de red'},
@@ -593,6 +611,7 @@
     cable:'Toca para ir poniendo puntos del cable. Conecta Cuadro → Interruptor → Luz. Doble toque o Enter para terminar.',
     cablered:'Cable de red: toca punto a punto para conectar Router → roseta/ordenador. Doble toque o Enter para terminar.',
     fotomover:'Arrastra para mover la foto de fondo. Cuando esté bien, elige otra herramienta.',
+    calibrar:'Toca un extremo de una distancia que conozcas en la foto, luego el otro extremo, y escribe cuántos metros mide.',
     texto:'Toca donde quieras escribir',
     simbolo:'Toca donde quieras colocarlo. Luego puedes girarlo en el panel derecho.'
   };
@@ -625,6 +644,7 @@
   let cableActual = null;
   let historial = [], rehacer = [];
   let pendiente = null;         // posición pendiente (texto)
+  let _calib = null;            // calibrado de foto: {x1,y1,x2,y2}
   let promptInstalar = null;
   let espacio = false;            // barra espaciadora pulsada (para mover la vista)
   let simulando = true;           // mostrar simulación eléctrica (brillo de cables)
@@ -902,8 +922,17 @@
     seleccion.forEach(o=>dibujarSeleccion(o));
     if(accion && accion.tipo==='banda') dibujarBanda();
     if(guias && guias.length) dibujarGuias();
+    if(herramienta==='calibrar' && _calib) dibujarCalib();
     dibujarReglas();
     actualizarEstado();
+  }
+  function dibujarCalib(){
+    const a=aPantalla(_calib.x1,_calib.y1);
+    ctx.save(); ctx.fillStyle='#dc2626'; ctx.beginPath(); ctx.arc(a.x,a.y,5,0,7); ctx.fill();
+    if(_calib.x2!=null){ const b=aPantalla(_calib.x2,_calib.y2);
+      ctx.strokeStyle='#dc2626'; ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+      ctx.setLineDash([]); ctx.beginPath(); ctx.arc(b.x,b.y,5,0,7); ctx.fill(); }
+    ctx.restore();
   }
   function fmtMcorto(m){ return (Math.round(m*10)/10).toString().replace('.',',')+'m'; }
   // detecta espacios cerrados con paredes y calcula sus m²
@@ -1492,6 +1521,11 @@
 
     if(herramienta==='mano'){ accion={tipo:'vista',px,py,ox:vista.x,oy:vista.y}; return; }
     if(herramienta==='fotomover'){ const f=plantas[plantaActual].fondo; if(f){ accion={tipo:'foto',px,py,ox:f.x,oy:f.y}; } return; }
+    if(herramienta==='calibrar'){
+      if(!_calib || _calib.x2!=null){ _calib={x1:m.x,y1:m.y}; const ay=document.getElementById('ayuda'); if(ay){ ay.textContent='Ahora toca el OTRO extremo de esa medida conocida.'; ay.style.display=''; } }
+      else { _calib.x2=m.x; _calib.y2=m.y; document.getElementById('calibM').value=''; abrir('modalCalib'); }
+      redibujar(); return;
+    }
 
     if(herramienta==='seleccionar'){
       const tir=tiradorEn(m.x,m.y);
@@ -1726,6 +1760,23 @@
     actualizarChip();
   }
 
+  /* ---- plantillas rápidas de estancia ---- */
+  const PLANTILLAS={
+    salon:[['sofa',0,0.7],['mesa',0,-0.5],['tv',0,-1.7],['luz',0,-0.9],['interruptor',2.2,1.3],['enchufe',-2.2,0.7],['enchufe',2.2,0.7],['tvtoma',0.6,-1.7]],
+    dormitorio:[['camadoble',0,0],['armario',-1.8,-0.9],['mesa',1.4,-1.2],['luz',0,-1.5],['interruptor',2,1.5],['enchufe',-1.3,1.3],['enchufe',1.3,1.3]],
+    cocina:[['cocina',0,0],['fregadero',-1.3,0],['nevera',1.4,0],['lavadora',-1.3,1.3],['luz',0,-1.3],['enchufe2',1.4,1.3],['enchufe',-0.2,-1.0]],
+    bano:[['inodoro',0.8,0.7],['lavabo',-0.9,0.7],['ducha',-0.9,-0.8],['luz',0,-0.2],['aplique',-0.9,-1.4],['interruptor',1.6,1.2],['enchufe',-1.6,0.7]],
+  };
+  function colocarPlantilla(k){ const t=PLANTILLAS[k]; if(!t) return; guardarHistorial(); elegir('seleccionar');
+    const c=aMundo(anchoCss()/2, altoCss()/2); const nuevos=[];
+    t.forEach(([clave,dx,dy])=>{ const s=SIMBOLOS[clave]; if(!s) return; const o={id:idNuevo(),tipo:'simbolo',clave,capa:s.capa,x:snap(c.x+mPx(dx)),y:snap(c.y+mPx(dy)),ang:0,escala:1,escalaX:1,escalaY:1}; objetos.push(o); nuevos.push(o); });
+    seleccion=nuevos; mostrarPropiedades(); autoguardar(); redibujar(); if(esMovil()) cerrarDrawers();
+  }
+  function plSalon(){ colocarPlantilla('salon'); }
+  function plDormitorio(){ colocarPlantilla('dormitorio'); }
+  function plCocina(){ colocarPlantilla('cocina'); }
+  function plBano(){ colocarPlantilla('bano'); }
+
   /* ---- cajones (menús ocultables) en móvil ---- */
   function esMovil(){ return window.matchMedia('(max-width:760px)').matches; }
   function toggleDrawer(cual){
@@ -1909,6 +1960,21 @@
   function setFotoTam(v){ const f=plantas[plantaActual].fondo; if(!f) return; f.escala=v/100; autoguardar(); redibujar(); }
   function toggleFotoVisible(){ const f=plantas[plantaActual].fondo; if(!f) return; f.visible=!(f.visible!==false); document.getElementById('btnFotoVis').textContent=(f.visible!==false)?'Ocultar':'Mostrar'; autoguardar(); redibujar(); }
   function modoMoverFoto(){ elegir('fotomover'); cerrar('modalFoto'); }
+  function startCalib(){ const f=plantas[plantaActual].fondo; if(!f||!f.src){ alert('Primero carga una foto de fondo.'); return; } _calib=null; cerrar('modalFoto'); elegir('calibrar'); }
+  function cancelCalib(){ cerrar('modalCalib'); _calib=null; elegir('seleccionar'); redibujar(); }
+  function aplicarCalib(){
+    const X=parseFloat((document.getElementById('calibM').value||'').replace(',','.'));
+    const f=plantas[plantaActual].fondo;
+    if(!X||X<=0||!_calib||_calib.x2==null||!f){ cancelCalib(); return; }
+    const D=Math.hypot(_calib.x2-_calib.x1,_calib.y2-_calib.y1); if(D<1){ cancelCalib(); return; }
+    guardarHistorial();
+    const k=mPx(X)/D;                              // factor para que la línea mida X metros
+    f.escala=(f.escala||1)*k;
+    f.x=_calib.x1-(_calib.x1-f.x)*k;              // escalar manteniendo fijo el primer punto
+    f.y=_calib.y1-(_calib.y1-f.y)*k;
+    const tam=document.getElementById('fTam'); if(tam) tam.value=Math.round((f.escala)*100);
+    _calib=null; cerrar('modalCalib'); autoguardar(); elegir('seleccionar'); redibujar();
+  }
   function quitarFoto(){ if(confirm('¿Quitar la foto de fondo?')){ plantas[plantaActual].fondo=null; _imgFondo=null; document.getElementById('fotoCtrls').style.display='none'; autoguardar(); redibujar(); } }
   function alternarSim(){ simulando=!simulando; document.getElementById('tgSim').classList.toggle('on',simulando); mostrarPropiedades(); redibujar(); }
   function alternarRed(){ simRed=!simRed; document.getElementById('tgRed').classList.toggle('on',simRed); mostrarPropiedades(); redibujar(); }
