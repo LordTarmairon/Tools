@@ -80,7 +80,7 @@
 
     /* ===== Herramientas izquierda ===== */
     .herramientas{
-      width:190px; background:linear-gradient(180deg,#1f2a3d,#1a2334); padding:8px; overflow-y:auto; flex-shrink:0;
+      width:190px; background:linear-gradient(180deg,#1f2a3d,#1a2334); padding:8px; overflow-y:auto; overflow-x:hidden; flex-shrink:0;
       display:flex; flex-direction:column; gap:3px; border-right:1px solid var(--linea);
     }
     .herramientas::-webkit-scrollbar{width:8px;}
@@ -144,7 +144,7 @@
     .bv-opt:hover{border-color:#2563eb; background:#f8fafc; transform:translateY(-2px);}
     .bv-opt i{font-size:24px;}
     .bv-opt .t{font-size:13.5px; font-weight:600;}
-    .bv-opt .s{font-size:11.5px; color:#64748b; line-height:1.2;}
+    .bv-opt .s{font-size:11.5px; color:#64748b; line-height:1.2; overflow-wrap:anywhere;}
     @media(max-width:560px){ .bv-opts{flex-direction:column;} .bv-opt{flex-direction:row; justify-content:flex-start; text-align:left;} .bv-opt .s{display:none;} }
     .tooltip-elem{
       position:absolute; background:rgba(15,23,42,.9); color:#fff; padding:5px 11px;
@@ -314,6 +314,7 @@
         <button onclick="abrirMateriales()" title="Superficies, materiales y leyenda"><i class="bi bi-clipboard-data"></i> Resumen</button>
         <button onclick="abrirCircuitos()" title="Circuitos eléctricos y esquema unifilar"><i class="bi bi-diagram-3"></i> Circuitos</button>
         <button onclick="abrirFoto()" title="Poner una foto de fondo para calcar el plano encima"><i class="bi bi-image-fill"></i> Foto de fondo</button>
+        <button onclick="abrir('modalPlantillas')" title="Insertar una estancia ya montada (baño, cocina, salón, dormitorio)"><i class="bi bi-grid-1x2"></i> Insertar plantilla</button>
         <button id="tgSim" class="toggle on" onclick="alternarSim()" title="Probar la instalación eléctrica: los cables y aparatos con corriente se iluminan"><i class="bi bi-lightning-charge-fill"></i> Probar luz</button>
         <button id="tgRed" class="toggle on" onclick="alternarRed()" title="Simular la red: cobertura WiFi y si llega la conexión a cada sitio"><i class="bi bi-wifi"></i> Probar red</button>
         <button class="btn-amarillo" onclick="abrir3D()" title="Ver el plano en 3 dimensiones"><i class="bi bi-badge-3d"></i> Ver en 3D</button>
@@ -354,7 +355,7 @@
         <p>Elige cómo quieres empezar. Podrás cambiarlo cuando quieras.</p>
         <div class="bv-opts">
           <button class="bv-opt" onclick="cerrarBienvenida()"><i class="bi bi-pencil-square" style="color:#2563eb"></i><span class="t">Plano en blanco</span><span class="s">Dibuja desde cero</span></button>
-          <button class="bv-opt" onclick="cerrarBienvenida();abrirFoto()"><i class="bi bi-image" style="color:#0ea5e9"></i><span class="t">Calcar una foto</span><span class="s">Pon una foto y dibuja encima</span></button>
+          <button class="bv-opt" onclick="cerrarBienvenida();abrirFoto()"><i class="bi bi-image" style="color:#0ea5e9"></i><span class="t">Calcar una foto</span><span class="s">Dibuja sobre una foto</span></button>
           <button class="bv-opt" onclick="cerrarBienvenida();abrir('modalPlantillas')"><i class="bi bi-grid-1x2" style="color:#16a34a"></i><span class="t">Una plantilla</span><span class="s">Baño, cocina, salón…</span></button>
         </div>
       </div>
@@ -402,7 +403,7 @@
     <h2>🔤 Escribe el texto</h2>
     <input type="text" id="entradaTexto" placeholder="Ej: Salón, Cocina, 220V...">
     <div class="modal-botones">
-      <button class="btn-rojo" onclick="cerrar('modalTexto')">Cancelar</button>
+      <button onclick="cerrar('modalTexto')">Cancelar</button>
       <button class="btn-verde" onclick="confirmarTexto()">Poner</button>
     </div>
   </div>
@@ -414,7 +415,7 @@
     <h2>💾 Guardar plano</h2>
     <input type="text" id="nombrePlano" placeholder="Nombre (ej: Casa del pueblo)">
     <div class="modal-botones">
-      <button class="btn-rojo" onclick="cerrar('modalGuardar')">Cancelar</button>
+      <button onclick="cerrar('modalGuardar')">Cancelar</button>
       <button class="btn-verde" onclick="confirmarGuardar()">Guardar</button>
     </div>
   </div>
@@ -427,7 +428,7 @@
     <p class="ayuda-txt" id="cargarVacio" style="display:none;">Todavía no has guardado ningún plano.</p>
     <div class="grid-planos" id="gridPlanos"></div>
     <div class="modal-botones">
-      <button class="btn-rojo" onclick="cerrar('modalCargar')">Cerrar</button>
+      <button onclick="cerrar('modalCargar')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -460,7 +461,7 @@
     <h2>📋 Resumen del proyecto</h2>
     <p class="ayuda-txt" style="margin-top:0">Superficies, materiales y leyenda de todo el proyecto (todas las plantas).</p>
     <div id="bomCont"></div>
-    <div class="modal-botones" style="margin-top:12px;"><button class="btn-rojo" onclick="cerrar('modalMateriales')">Cerrar</button><button class="btn-verde" onclick="imprimir()"><i class="bi bi-printer"></i> Imprimir con plano</button></div>
+    <div class="modal-botones" style="margin-top:12px;"><button onclick="cerrar('modalMateriales')">Cerrar</button><button class="btn-verde" onclick="imprimir()"><i class="bi bi-printer"></i> Imprimir con plano</button></div>
   </div>
 </div>
 
@@ -475,7 +476,7 @@
       <button onclick="abrirUnifilar()"><i class="bi bi-diagram-3"></i> Ver esquema unifilar</button>
     </div>
     <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;cursor:pointer"><input type="checkbox" id="chkVerCirc" style="width:auto;transform:scale(1.2)" onchange="verCircuitos=this.checked;redibujar()"> Ver los colores de circuito sobre el plano</label>
-    <div class="modal-botones" style="margin-top:12px;"><button class="btn-rojo" onclick="cerrar('modalCircuitos')">Cerrar</button></div>
+    <div class="modal-botones" style="margin-top:12px;"><button onclick="cerrar('modalCircuitos')">Cerrar</button></div>
   </div>
 </div>
 
@@ -484,7 +485,7 @@
     <h2>📐 Esquema unifilar</h2>
     <p class="ayuda-txt" style="margin-top:0">Cuadro general de mando y protección con todos los circuitos, su magnetotérmico y la sección de cable.</p>
     <div id="uniCont" style="overflow:auto;border:1px solid var(--borde);border-radius:10px;padding:8px;background:#fff"></div>
-    <div class="modal-botones" style="margin-top:12px;"><button class="btn-rojo" onclick="cerrar('modalUnifilar')">Cerrar</button><button class="btn-verde" onclick="imprimirUnifilar()"><i class="bi bi-printer"></i> Imprimir</button></div>
+    <div class="modal-botones" style="margin-top:12px;"><button onclick="cerrar('modalUnifilar')">Cerrar</button><button class="btn-verde" onclick="imprimirUnifilar()"><i class="bi bi-printer"></i> Imprimir</button></div>
   </div>
 </div>
 
@@ -505,7 +506,7 @@
         <button class="btn-rojo" onclick="quitarFoto()"><i class="bi bi-trash"></i></button>
       </div>
     </div>
-    <div class="modal-botones" style="margin-top:12px"><button class="btn-verde" onclick="cerrar('modalFoto')">Cerrar</button></div>
+    <div class="modal-botones" style="margin-top:12px"><button onclick="cerrar('modalFoto')">Cerrar</button></div>
   </div>
 </div>
 
@@ -520,7 +521,7 @@
       <button class="btn-azul" onclick="cerrar('modalPlantillas');plCocina()"><i class="bi bi-egg-fried"></i> Cocina</button>
       <button class="btn-azul" onclick="cerrar('modalPlantillas');plBano()"><i class="bi bi-droplet-half"></i> Baño</button>
     </div>
-    <div class="modal-botones" style="margin-top:12px"><button class="btn-rojo" onclick="cerrar('modalPlantillas')">Cancelar</button></div>
+    <div class="modal-botones" style="margin-top:12px"><button onclick="cerrar('modalPlantillas')">Cancelar</button></div>
   </div>
 </div>
 
@@ -552,7 +553,7 @@
 <div id="modal3d">
   <div class="barra3d">
     <h2><i class="bi bi-badge-3d"></i> Vista 3D</h2>
-    <button onclick="cerrar3D()" class="btn-rojo"><i class="bi bi-x-lg"></i> Cerrar</button>
+    <button onclick="cerrar3D()" class="btn-cerrar3d"><i class="bi bi-x-lg"></i> Cerrar</button>
   </div>
   <div id="lienzo3d-cont">
     <div class="hint3d">🖱️ Arrastra para girar · rueda para acercar</div>
@@ -648,12 +649,6 @@
         {h:'habitacion', ico:'⬛', txt:'Habitación'},
         {h:'puerta', ico:'🚪', txt:'Puerta'},
         {h:'ventana', ico:'🪟', txt:'Ventana'},
-      ]},
-    {seccion:'Plantillas', items:[
-        {h:'pl_salon', ico:'🛋️', txt:'Salón', fn:'plSalon'},
-        {h:'pl_dormitorio', ico:'🛏️', txt:'Dormitorio', fn:'plDormitorio'},
-        {h:'pl_cocina', ico:'🍳', txt:'Cocina', fn:'plCocina'},
-        {h:'pl_bano', ico:'🛁', txt:'Baño', fn:'plBano'},
       ]},
     {seccion:'Eléctrico', cat:'electrico'},
     {seccion:'Red / Datos', cat:'datos', items:[
