@@ -1985,6 +1985,11 @@
     if(esMovil()){
       if(_hacc.parentNode!==_menuApp) _menuApp.appendChild(_hacc);
       if(_barra.parentNode!==_menuApp) _menuApp.appendChild(_barra);
+      // en móvil los paneles son cajones: deshacer el plegado de escritorio para que puedan abrirse
+      ['herramientas','propiedades'].forEach(id=>{ const p=document.getElementById(id); if(p) p.classList.remove('oculto'); });
+      const ti=document.getElementById('togIzq'), td=document.getElementById('togDer');
+      if(ti){ ti.classList.remove('ver'); const i=ti.querySelector('i'); if(i) i.className='bi bi-chevron-left'; }
+      if(td){ td.classList.remove('ver'); const i=td.querySelector('i'); if(i) i.className='bi bi-chevron-right'; }
     } else {
       cerrarDrawers();
       if(_hacc.parentNode===_menuApp) _origHacc.p.insertBefore(_hacc, _origHacc.n);
@@ -2140,7 +2145,7 @@
     const tam=document.getElementById('fTam'); if(tam) tam.value=Math.round((f.escala)*100);
     _calib=null; cerrar('modalCalib'); autoguardar(); elegir('seleccionar'); redibujar();
   }
-  function quitarFoto(){ if(confirm('¿Quitar la foto de fondo?')){ plantas[plantaActual].fondo=null; _imgFondo=null; document.getElementById('fotoCtrls').style.display='none'; autoguardar(); redibujar(); } }
+  function quitarFoto(){ confirmarBonito('Quitar la foto','Se quitará la foto de fondo del plano.', ()=>{ plantas[plantaActual].fondo=null; _imgFondo=null; document.getElementById('fotoCtrls').style.display='none'; autoguardar(); redibujar(); }, '🖼️', 'Sí, quitar'); }
   function alternarSim(){ simulando=!simulando; document.getElementById('tgSim').classList.toggle('on',simulando); mostrarPropiedades(); redibujar(); }
   function alternarRed(){ simRed=!simRed; document.getElementById('tgRed').classList.toggle('on',simRed); mostrarPropiedades(); redibujar(); }
 
@@ -2257,6 +2262,10 @@
       case 'bidet': cyl(Math.min(wm,dm)*0.4,0.4,SAN,0,0.2,0); break;
       case 'banera': box(wm,0.55,dm,SAN,0,0.275,0); box(wm-0.16,0.4,dm-0.16,BAS,0,0.42,0); break;
       case 'ducha': box(wm,0.08,dm,SAN,0,0.04,0); box(wm,1.9,0.03,matT(0xbfe0f0),0,0.95,-dm/2+0.015); box(0.03,1.9,dm,matT(0xbfe0f0),-wm/2+0.015,0.95,0); cyl(0.04,0.06,0xb0bccb,wm*0.32,1.85,-dm/2+0.06); break;
+      case 'radiador': { const d=Math.min(dm,0.12); box(wm,0.55,d,WHITE,0,0.45,0); const n=Math.max(4,Math.round(wm/0.12)); for(let i=0;i<n;i++){ box(0.03,0.5,d+0.02,0xd8dce2,-wm/2+ (i+0.5)*(wm/n),0.45,0); } break; }
+      case 'split': box(wm,0.3,Math.min(dm,0.24),WHITE,0,2.15,0); box(wm*0.9,0.02,Math.min(dm,0.2),0xb9c2cd,0,2.02,0.02); break;
+      case 'suelorad': box(wm,0.025,dm,0xf5c9a2,0,0.013,0); break;
+      case 'termo': { const r=Math.min(wm,dm)*0.45; cyl(r,0.95,WHITE,0,1.35,0); cyl(0.03,0.35,0x94a3b8,0,0.75,0); break; }
       default: box(wm,0.6,dm,WOOD,0,0.3,0);
     }
     return g;
@@ -2311,28 +2320,31 @@
           const m=new THREE.Mesh(new THREE.BoxGeometry(an,1.0,wt+0.12), new THREE.MeshLambertMaterial({color:0x9cd3ec, transparent:true, opacity:0.6}));
           m.position.set(mx, baseY+1.4, mz); m.rotation.y=-ang; scene.add(m); exp(mx,mz);
         }
-        else if(o.tipo==='simbolo' && (o.capa==='muebles'||o.capa==='fontaneria')){
+        else if(o.tipo==='simbolo' && (o.capa==='muebles'||o.capa==='fontaneria'||o.capa==='clima')){
           const s=SIMBOLOS[o.clave]; const wm=s.m[0]*(o.escalaX||o.escala||1), dm=s.m[1]*(o.escalaY||o.escala||1);
           const g=mueble3D(o.clave, wm, dm);
           g.position.set(pxM(o.x), baseY, pxM(o.y)); g.rotation.y=-(o.ang||0)*Math.PI/180; scene.add(g);
           exp(pxM(o.x),pxM(o.y)); bb.maxy=Math.max(bb.maxy, baseY+(ALT_MUEBLE[o.clave]||ALT_SANIT[o.clave]||1));
         }
+        else if(o.tipo==='simbolo' && o.capa==='anotacion'){ /* Norte/escala: solo en el plano 2D */ }
         else if(o.tipo==='simbolo'){   // eléctrico / datos: marcadores
           const col=COL_CAPA3D[o.capa]||0x888888; let mesh;
-          if(o.clave==='luz'||o.clave==='aplique'){
+          if(['luz','aplique','luzpared','focoled','tiraled'].includes(o.clave)){
             mesh=new THREE.Mesh(new THREE.SphereGeometry(0.13,12,10), new THREE.MeshLambertMaterial({color:0xf6c343, emissive:0x5a4500}));
-            mesh.position.set(pxM(o.x), baseY+ALT_PARED-0.16, pxM(o.y));
+            const altoLuz=(o.clave==='luz'||o.clave==='tiraled')?ALT_PARED-0.16:1.9;   // apliques/focos a media pared
+            mesh.position.set(pxM(o.x), baseY+altoLuz, pxM(o.y));
           } else if(o.clave==='subida'||o.clave==='subidared'){
             mesh=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,ALT_PARED,10), new THREE.MeshLambertMaterial({color:col}));
             mesh.position.set(pxM(o.x), baseY+ALT_PARED/2, pxM(o.y));
-          } else if(o.clave==='cuadro'){
+          } else if(o.clave==='cuadro'||o.clave==='cgp'||o.clave==='contador'){
             mesh=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.42,0.12), new THREE.MeshLambertMaterial({color:0xdc2626}));
             mesh.position.set(pxM(o.x), baseY+1.45, pxM(o.y));
           } else if(o.clave==='pc'){
             mesh=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.30,0.06), new THREE.MeshLambertMaterial({color:0x334155}));
             mesh.position.set(pxM(o.x), baseY+0.9, pxM(o.y));
           } else {
-            const alto=(o.clave==='router'||o.clave==='ap'||o.clave==='switchred')?1.4:0.32;
+            const alto=(o.clave==='router'||o.clave==='ap'||o.clave==='switchred')?1.4
+              :(['interruptor','conmutador','intdoble','persianas','pulsador','timbre','porteroplaca','porterointer'].includes(o.clave)?1.1:0.32);
             mesh=new THREE.Mesh(new THREE.BoxGeometry(0.18,0.18,0.1), new THREE.MeshLambertMaterial({color:col}));
             mesh.position.set(pxM(o.x), baseY+alto, pxM(o.y));
           }
@@ -2424,6 +2436,10 @@
   function planos(){ try{return JSON.parse(localStorage.getItem(CLAVE))||{};}catch(e){return {};} }
   function setPlanos(p){ localStorage.setItem(CLAVE,JSON.stringify(p)); }
   function autoguardar(){ try{ localStorage.setItem('planoBorrador',JSON.stringify({plantas:plantas.map(p=>({nombre:p.nombre,objetos:p.objetos,fondo:p.fondo})), plantaActual, metrosPorCuadro, circuitos})); }catch(e){} }
+  // guardar también al salir/ocultar la página (el guardado normal va con retardo)
+  window.addEventListener('pagehide', autoguardar);
+  window.addEventListener('beforeunload', autoguardar);
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') autoguardar(); });
 
   /* ---- gestión de plantas ---- */
   function cambiarPlanta(i){ if(i<0||i>=plantas.length) return; plantaActual=i; objetos=plantas[i].objetos; historial.length=0; rehacer.length=0; seleccion=[]; actualizarPlantas(); mostrarPropiedades(); redibujar(); }
@@ -2432,8 +2448,8 @@
   function renombrarPlanta(){ const n=prompt('Nombre de la planta:', plantas[plantaActual].nombre); if(n && n.trim()){ plantas[plantaActual].nombre=n.trim(); actualizarPlantas(); autoguardar(); } }
   function borrarPlanta(){
     if(plantas.length<=1){
-      confirmarBonito('Vaciar la planta','Se borrará todo lo dibujado y la planta quedará en blanco.', ()=>{
-        guardarHistorial(); setObjetos([]); plantas[plantaActual].fondo=null; _imgFondo=null; seleccion=[]; historial.length=0; rehacer.length=0; _verBienvenida=true; mostrarPropiedades(); autoguardar(); redibujar();
+      confirmarBonito('Vaciar la planta','Se borrará todo lo dibujado y la planta quedará en blanco. Podrás deshacerlo con ↩️.', ()=>{
+        guardarHistorial(); setObjetos([]); plantas[plantaActual].fondo=null; _imgFondo=null; seleccion=[]; _verBienvenida=true; mostrarPropiedades(); autoguardar(); redibujar();
       }, '🧹', 'Sí, vaciar');
       return;
     }
@@ -2497,7 +2513,7 @@
     metrosPorCuadro=p.metrosPorCuadro||0.5; document.getElementById('selEscala').value=metrosPorCuadro;
     circuitos=p.circuitos||[];
     nombreActual=n; actualizarNombre(); seleccion=[]; historial.length=0; rehacer.length=0; actualizarPlantas(); mostrarPropiedades(); ajustarVista(); } cerrar('modalCargar'); }
-  function borrarPlano(n){ if(confirm('¿Borrar el plano "'+n+'"?')){ const t=planos(); delete t[n]; setPlanos(t); abrirCargar(); } }
+  function borrarPlano(n){ confirmarBonito('¿Borrar el plano?','Se borrará "'+n+'" de este aparato para siempre.', ()=>{ const t=planos(); delete t[n]; setPlanos(t); abrirCargar(); }, '🗑️', 'Sí, borrar'); }
   function descargarPlano(){
     const datos={tipo:'plano-padre', version:1, nombre:nombreActual||'plano', metrosPorCuadro, circuitos, plantas:plantas.map(p=>({nombre:p.nombre,objetos:p.objetos,fondo:p.fondo}))};
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(datos)],{type:'application/json'}));
@@ -2524,7 +2540,7 @@
     const a=document.createElement('a'); a.download=(nombreActual||'plano')+'.png'; a.href=data; a.click();
   }
   function resumenMateriales(){
-    const r={enchufes:0,interruptores:0,luces:0,cuadros:0,tomas:0,subidas:0,router:0,ap:0,switchred:0,roseta:0,plc:0,pc:0,sanit:0,muebles:0,puertas:0,ventanas:0,habitaciones:0,m2:0,paredM:0,cableElec:{},cableRed:0};
+    const r={enchufes:0,interruptores:0,luces:0,cuadros:0,tomas:0,subidas:0,porteros:0,clima:0,router:0,ap:0,switchred:0,roseta:0,plc:0,pc:0,sanit:0,muebles:0,puertas:0,ventanas:0,habitaciones:0,m2:0,paredM:0,cableElec:{},cableRed:0};
     plantas.forEach(pl=>pl.objetos.forEach(o=>{
       if(o.tipo==='pared') r.paredM+=pxM(Math.hypot(o.x2-o.x1,o.y2-o.y1));
       else if(o.tipo==='habitacion'){ r.habitaciones++; const w=pxM(Math.abs(o.x2-o.x1)),h=pxM(Math.abs(o.y2-o.y1)); r.m2+=w*h; r.paredM+=2*(w+h); }
@@ -2532,9 +2548,15 @@
       else if(o.tipo==='ventana') r.ventanas++;
       else if(o.tipo==='cable'){ const m=longitudCable(o); if(o.capa==='datos') r.cableRed+=m; else { const t=o.tipoCable||'normal'; r.cableElec[t]=(r.cableElec[t]||0)+m; } }
       else if(o.tipo==='simbolo'){ const k=o.clave;
-        if(k==='enchufe'||k==='enchufe2')r.enchufes++; else if(k==='interruptor'||k==='conmutador')r.interruptores++;
-        else if(k==='luz'||k==='aplique')r.luces++; else if(k==='cuadro')r.cuadros++; else if(k==='tvtoma'||k==='redtoma')r.tomas++; else if(k==='subida')r.subidas++;
+        if(k==='enchufe'||k==='enchufe2')r.enchufes++;
+        else if(['interruptor','conmutador','intdoble','persianas','pulsador'].includes(k))r.interruptores++;
+        else if(['luz','aplique','luzpared','focoled','tiraled'].includes(k))r.luces++;
+        else if(['cuadro','cgp','contador'].includes(k))r.cuadros++;
+        else if(['tvtoma','redtoma','tomatel','tlca'].includes(k))r.tomas++;
+        else if(k==='subida'||k==='subidared')r.subidas++;
+        else if(['timbre','porteroplaca','porterointer'].includes(k))r.porteros++;
         else if(k==='router')r.router++; else if(k==='ap')r.ap++; else if(k==='switchred')r.switchred++; else if(k==='roseta')r.roseta++; else if(k==='plc')r.plc++; else if(k==='pc')r.pc++;
+        else if(o.capa==='clima')r.clima++;
         else if(o.capa==='fontaneria')r.sanit++; else if(o.capa==='muebles')r.muebles++;
       }
     }));
@@ -2546,13 +2568,13 @@
     let cE=''; Object.keys(r.cableElec).forEach(t=>{ cE+=f('Cable '+(nomT[t]||t), fM(r.cableElec[t])); });
     return `<table class="bom" style="width:100%;border-collapse:collapse">
       <tr><th colspan="2">Construcción</th></tr>${f('Habitaciones',r.habitaciones)}${f('Superficie total',fM2(r.m2))}${f('Paredes (longitud)',fM(r.paredM))}${f('Puertas',r.puertas)}${f('Ventanas',r.ventanas)}
-      <tr><th colspan="2">Eléctrico</th></tr>${f('Cuadros',r.cuadros)}${f('Enchufes',r.enchufes)}${f('Interruptores',r.interruptores)}${f('Luces / apliques',r.luces)}${f('Tomas TV/datos',r.tomas)}${f('Subidas',r.subidas)}${cE}
+      <tr><th colspan="2">Eléctrico</th></tr>${f('Cuadros / protección',r.cuadros)}${f('Enchufes',r.enchufes)}${f('Interruptores / pulsadores',r.interruptores)}${f('Luces / apliques',r.luces)}${f('Tomas TV/datos/teléfono',r.tomas)}${f('Timbre / portero',r.porteros)}${f('Subidas',r.subidas)}${cE}
       <tr><th colspan="2">Red / Datos</th></tr>${f('Routers',r.router)}${f('Puntos de acceso',r.ap)}${f('Switches',r.switchred)}${f('Rosetas',r.roseta)}${f('PLC',r.plc)}${f('Ordenadores',r.pc)}${f('Cable de red',fM(r.cableRed))}
-      <tr><th colspan="2">Otros</th></tr>${f('Sanitarios',r.sanit)}${f('Muebles',r.muebles)}</table>`;
+      <tr><th colspan="2">Otros</th></tr>${f('Calefacción / clima',r.clima)}${f('Sanitarios',r.sanit)}${f('Muebles',r.muebles)}</table>`;
   }
   /* ---- Presupuesto estimado (precios editables, se guardan) ---- */
-  const PRES_DEF={cuadros:120,enchufes:12,interruptores:12,luces:25,tomas:15,cableElecTotal:1.2,cableRed:0.8,router:40,ap:35,switchred:30,roseta:8,plc:35,puertas:90,ventanas:180,paredM:0,sanit:150,m2:0};
-  const PRES_LIN=[['cuadros','Cuadro eléctrico','ud'],['enchufes','Enchufes','ud'],['interruptores','Interruptores / conmutadores','ud'],['luces','Puntos de luz / apliques','ud'],['tomas','Tomas TV / datos','ud'],['cableElecTotal','Cable eléctrico','m'],['cableRed','Cable de red','m'],['router','Routers','ud'],['ap','Puntos de acceso','ud'],['switchred','Switches','ud'],['roseta','Rosetas','ud'],['plc','PLC','ud'],['puertas','Puertas','ud'],['ventanas','Ventanas','ud'],['paredM','Tabique / pared','m'],['sanit','Sanitarios','ud'],['m2','Superficie (obra)','m²']];
+  const PRES_DEF={cuadros:120,enchufes:12,interruptores:12,luces:25,tomas:15,porteros:60,cableElecTotal:1.2,cableRed:0.8,router:40,ap:35,switchred:30,roseta:8,plc:35,puertas:90,ventanas:180,paredM:0,clima:120,sanit:150,m2:0};
+  const PRES_LIN=[['cuadros','Cuadro eléctrico','ud'],['enchufes','Enchufes','ud'],['interruptores','Interruptores / conmutadores','ud'],['luces','Puntos de luz / apliques','ud'],['tomas','Tomas TV / datos','ud'],['porteros','Timbre / portero','ud'],['cableElecTotal','Cable eléctrico','m'],['cableRed','Cable de red','m'],['router','Routers','ud'],['ap','Puntos de acceso','ud'],['switchred','Switches','ud'],['roseta','Rosetas','ud'],['plc','PLC','ud'],['puertas','Puertas','ud'],['ventanas','Ventanas','ud'],['paredM','Tabique / pared','m'],['clima','Calefacción / clima','ud'],['sanit','Sanitarios','ud'],['m2','Superficie (obra)','m²']];
   function preciosUsuario(){ let p={}; try{ p=JSON.parse(localStorage.getItem('planosPrecios'))||{}; }catch(e){} return Object.assign({}, PRES_DEF, p); }
   function setPrecio(k,v){ let p={}; try{ p=JSON.parse(localStorage.getItem('planosPrecios'))||{}; }catch(e){} p[k]=parseFloat((''+v).replace(',','.'))||0; localStorage.setItem('planosPrecios',JSON.stringify(p)); recalcPres(); }
   function cantidadPres(r,k){ if(k==='cableElecTotal') return Object.values(r.cableElec).reduce((a,b)=>a+b,0); return r[k]||0; }
